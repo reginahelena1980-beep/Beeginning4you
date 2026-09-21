@@ -1,0 +1,72 @@
+
+<svg viewBox="0 0 246 108" xmlns="http://www.w3.org/2000/svg" width="600" height="260">
+  <rect width="100%" height="100%" fill="#F8F6F0"/>
+  
+  <!-- Flight path -->
+  <path
+    d="M 144.4 76.5 C 152 64, 166 55, 178 58 C 188 60, 196 52, 202 40"
+    stroke="#181B1E"
+    stroke-width="3"
+    fill="none"
+    stroke-linecap="round"
+  />
+  
+  <!-- Bee group at (214, 30) tilted at -36 deg -->
+  <g transform="translate(214, 30) rotate(-36)">
+    <!-- 1. Stinger (points to -15.5, 0 where flight line arrives) -->
+    <path
+      d="M -15.5,0 L -11.5,-2.8 C -11,-1 -11,1 -11.5,2.8 Z"
+      fill="#181B1E"
+    />
+
+    <!-- 2. Body stripe 1 (posterior) -->
+    <path
+      d="M -8.5,-4.8 C -6.5,-5.3 -4.5,-5.5 -3.5,-5.5 L -3.5,5.5 C -4.5,5.5 -6.5,5.3 -8.5,4.8 C -9.2,2.5 -9.2,-2.5 -8.5,-4.8 Z"
+      fill="#181B1E"
+    />
+
+    <!-- 3. Body stripe 2 (middle / thorax) -->
+    <path
+      d="M 0,-6.7 C 2,-6.9 4,-6.8 5.5,-6.3 L 5.5,6.3 C 4,6.8 2,6.9 0,6.7 C -0.8,4.5 -0.8,-4.5 0,-6.7 Z"
+      fill="#181B1E"
+    />
+
+    <!-- 4. Head: rounded dome at the front -->
+    <path
+      d="M 8.5,-5.2 C 10,-4.5 13.5,-2.5 13.5,0 C 13.5,2.5 10,4.5 8.5,5.2 C 7.8,2.5 7.8,-2.5 8.5,-5.2 Z"
+      fill="#181B1E"
+    />
+
+    <!-- 5. Antennae with cute rounded dots at tips -->
+    <!-- Antenna 1 (curves up-left) -->
+    <path
+      d="M 12,-2 C 13.5,-6 13,-10 10.5,-13"
+      stroke="#181B1E"
+      stroke-width="1.8"
+      fill="none"
+      stroke-linecap="round"
+    />
+    <circle cx="10.5" cy="-13" r="1.6" fill="#181B1E" />
+
+    <!-- Antenna 2 (curves up-forward) -->
+    <path
+      d="M 13,0 C 15.5,-2 18.5,-4 20.5,-3"
+      stroke="#181B1E"
+      stroke-width="1.8"
+      fill="none"
+      stroke-linecap="round"
+    />
+    <circle cx="20.5" cy="-3" r="1.6" fill="#181B1E" />
+
+    <!-- 6. Wings: infinity symbol (loop) across thorax -->
+    <!-- Center of infinity around (3, -2) -->
+    <path
+      d="M 3,-2 C 0,-7 -6,-14 -12,-11 C -18,-8 -12,1 3,-2 C 18,-5 24,4 21,9 C 18,14 10,6 3,-2 Z"
+      stroke="#181B1E"
+      stroke-width="2.8"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

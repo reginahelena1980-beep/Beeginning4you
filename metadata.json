@@ -1,0 +1,6 @@
+{
+  "name": "Beeginning 4 You",
+  "description": "Digital solutions for small businesses. Soluções digitais práticas, humanas e sob medida para impulsionar pequenos negócios.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

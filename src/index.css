@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Baguet Script";
+  src: url("https://db.onlinewebfonts.com/t/28e67249ffb4406c80cbdf2f61f2a449.eot");
+  src: url("https://db.onlinewebfonts.com/t/28e67249ffb4406c80cbdf2f61f2a449.eot?#iefix") format("embedded-opentype"),
+       url("https://db.onlinewebfonts.com/t/28e67249ffb4406c80cbdf2f61f2a449.woff2") format("woff2"),
+       url("https://db.onlinewebfonts.com/t/28e67249ffb4406c80cbdf2f61f2a449.woff") format("woff"),
+       url("https://db.onlinewebfonts.com/t/28e67249ffb4406c80cbdf2f61f2a449.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+  
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+}
+
+.font-baguet {
+  font-family: 'Baguet Script', 'Caveat', cursive, sans-serif;
+}
+
+.font-adlam {
+  font-family: 'ADLaM Display', system-ui, sans-serif;
+}
+
+.font-script {
+  font-family: 'Baguet Script', 'Caveat', cursive, sans-serif;
+}
+
+/* Clean backgrounds - dots removed per user request */
+
+
