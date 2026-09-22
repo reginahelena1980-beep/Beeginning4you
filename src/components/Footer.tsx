@@ -1,7 +1,22 @@
-import { ArrowUp, Heart, Sparkles, Phone, Mail, MapPin } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowUp, Heart, Sparkles, Phone, Mail, MapPin, Lock } from 'lucide-react';
 import BeeLogo from './BeeLogo';
+import { getContactConfig, STORAGE_CHANGE_EVENT } from '../utils/adminStorage';
 
-export default function Footer() {
+interface FooterProps {
+  onOpenConversation?: () => void;
+  onOpenAdmin?: () => void;
+}
+
+export default function Footer({ onOpenConversation, onOpenAdmin }: FooterProps) {
+  const [config, setConfig] = useState(getContactConfig());
+
+  useEffect(() => {
+    const handleStorageChange = () => setConfig(getContactConfig());
+    window.addEventListener(STORAGE_CHANGE_EVENT, handleStorageChange);
+    return () => window.removeEventListener(STORAGE_CHANGE_EVENT, handleStorageChange);
+  }, []);
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -39,59 +54,33 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <a
-                  href="#inicio"
-                  className="hover:text-[#E5A93B] transition-colors"
-                >
+                <a href="#inicio" className="hover:text-[#E5A93B] transition-colors">
                   Início
                 </a>
               </li>
               <li>
-                <a
-                  href="#quem-somos"
-                  className="hover:text-[#E5A93B] transition-colors"
-                >
+                <a href="#quem-somos" className="hover:text-[#E5A93B] transition-colors">
                   Quem Somos & O Conceito
                 </a>
               </li>
               <li>
-                <a
-                  href="#filosofia"
-                  className="hover:text-[#E5A93B] transition-colors"
-                >
-                  Nossa Filosofia (Ideia ➔ Forma ➔ Solução)
+                <a href="#filosofia" className="hover:text-[#E5A93B] transition-colors">
+                  Nossa Filosofia
                 </a>
               </li>
               <li>
-                <a
-                  href="#solucoes"
-                  className="hover:text-[#E5A93B] transition-colors"
-                >
+                <a href="#solucoes" className="hover:text-[#E5A93B] transition-colors">
                   O Que Fazemos
                 </a>
               </li>
               <li>
-                <a
-                  href="#para-quem"
-                  className="hover:text-[#E5A93B] transition-colors"
-                >
+                <a href="#para-quem" className="hover:text-[#E5A93B] transition-colors">
                   Para Quem É
                 </a>
               </li>
               <li>
-                <a
-                  href="#historias"
-                  className="hover:text-[#E5A93B] transition-colors"
-                >
-                  Casos Reais
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#contato"
-                  className="hover:text-[#E5A93B] transition-colors"
-                >
-                  Contato &amp; Diagnóstico
+                <a href="#historias" className="hover:text-[#E5A93B] transition-colors">
+                  Projetos Reais
                 </a>
               </li>
             </ul>
@@ -105,11 +94,14 @@ export default function Footer() {
             <ul className="space-y-2.5 text-xs sm:text-sm text-[#A0A09B]">
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-[#E5A93B] shrink-0" />
-                <span>WhatsApp: (11) 99999-9999 (Atendimento humanizado)</span>
+                <span>
+                  WhatsApp:{' '}
+                  <strong className="text-white font-mono">{config.whatsappNumber}</strong>
+                </span>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-[#E5A93B] shrink-0" />
-                <span>contato@beeginning4you.com.br</span>
+                <span className="text-white">{config.email}</span>
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[#E5A93B] shrink-0" />
@@ -130,8 +122,19 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#80807B]">
-          <div className="flex items-center gap-1.5 text-center sm:text-left">
-            <span>&copy; {currentYear} Beeginning 4 You · Todos os direitos reservados.</span>
+          <div className="flex items-center gap-1.5 text-center sm:text-left flex-wrap">
+            {/* The interactive copyright symbol for Admin Access */}
+            <button
+              id="admin-copyright-trigger"
+              type="button"
+              onClick={onOpenAdmin}
+              className="inline-flex items-center gap-1 text-[#E0E0DB] hover:text-[#E5A93B] transition-colors font-semibold group cursor-pointer focus:outline-none"
+              title="Acesso Administrativo (Restrito)"
+            >
+              <span className="group-hover:underline">© 2026</span>
+              <Lock className="w-3 h-3 text-[#E5A93B] opacity-40 group-hover:opacity-100 transition-opacity" />
+            </button>
+            <span>Beeginning 4 You · Todos os direitos reservados.</span>
             <span className="hidden sm:inline">·</span>
             <span className="hidden sm:inline">Digital solutions for small businesses</span>
           </div>
@@ -143,7 +146,7 @@ export default function Footer() {
 
             <button
               onClick={scrollToTop}
-              className="p-2 rounded-lg bg-white/10 hover:bg-[#E5A93B] hover:text-[#1A1A1A] transition-colors"
+              className="p-2 rounded-lg bg-white/10 hover:bg-[#E5A93B] hover:text-[#1A1A1A] transition-colors cursor-pointer"
               title="Voltar ao topo"
               aria-label="Voltar ao topo"
             >

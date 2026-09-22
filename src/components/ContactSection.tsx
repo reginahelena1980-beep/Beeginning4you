@@ -1,22 +1,40 @@
-import { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
+import React, { useState, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import {
   Send,
   MessageSquare,
   CheckCircle2,
-  Clock,
   Sparkles,
-  Phone,
-  Mail,
-  HelpCircle
+  Video,
+  ShieldCheck,
+  X,
+  ArrowRight
 } from 'lucide-react';
 import { ContactFormData } from '../types';
+import { saveDemandForm, getContactConfig, STORAGE_CHANGE_EVENT } from '../utils/adminStorage';
 
 interface ContactSectionProps {
   prefilledNeed?: string;
   prefilledSolution?: string;
+  onOpenMeeting?: () => void;
+  onOpenWhatsApp?: () => void;
+  isOpenDirectly?: boolean;
 }
 
-export default function ContactSection({ prefilledNeed = '', prefilledSolution = '' }: ContactSectionProps) {
+export default function ContactSection({
+  prefilledNeed = '',
+  prefilledSolution = '',
+  onOpenMeeting,
+  isOpenDirectly = false
+}: ContactSectionProps) {
+  const [isModalOpen, setIsModalOpen] = useState(isOpenDirectly);
+  const [contactConfig, setContactConfig] = useState(getContactConfig());
+
+  useEffect(() => {
+    const handleConfigChange = () => setContactConfig(getContactConfig());
+    window.addEventListener(STORAGE_CHANGE_EVENT, handleConfigChange);
+    return () => window.removeEventListener(STORAGE_CHANGE_EVENT, handleConfigChange);
+  }, []);
+
   const [formData, setFormData] = useState<ContactFormData>({
     name: '',
     businessName: '',
@@ -43,8 +61,15 @@ export default function ContactSection({ prefilledNeed = '', prefilledSolution =
         ...prev,
         biggestNeed: prev.biggestNeed ? `${prev.biggestNeed}\n\n${combined}` : combined
       }));
+      setIsModalOpen(true);
     }
   }, [prefilledNeed, prefilledSolution]);
+
+  useEffect(() => {
+    if (isOpenDirectly) {
+      setIsModalOpen(true);
+    }
+  }, [isOpenDirectly]);
 
   const handleChange = (
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -56,11 +81,24 @@ export default function ContactSection({ prefilledNeed = '', prefilledSolution =
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // Smooth user feedback
+
+    saveDemandForm({
+      id: `demand-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      name: formData.name.trim(),
+      email: formData.contactValue.includes('@') ? formData.contactValue.trim() : '',
+      phone: formData.contactValue.trim(),
+      businessDescription: `${formData.businessName ? `[${formData.businessName} - ${formData.segment}] ` : ''}${formData.biggestNeed.trim()}`,
+      mainGoal: formData.projectStage,
+      urgency: formData.projectStage === 'urgente' ? 'alta' : 'media',
+      origin: 'diagnostic_pedir',
+      status: 'new',
+      createdAt: new Date().toISOString()
+    });
+
     setTimeout(() => {
       setIsSubmitting(false);
       setIsSubmitted(true);
-    }, 600);
+    }, 450);
   };
 
   const generateWhatsAppUrl = () => {
@@ -71,326 +109,304 @@ export default function ContactSection({ prefilledNeed = '', prefilledSolution =
     };
 
     const text = encodeURIComponent(
-      `Olá, Beeginning 4 You! Gostaria de conversar sobre uma solução digital para o meu negócio.\n\n` +
+      `Olá, Beeginning 4 You! Enviei o meu diagnóstico pelo formulário de contato do site.\n\n` +
       `👤 *Meu Nome:* ${formData.name || 'Não informado'}\n` +
       `🏢 *Negócio:* ${formData.businessName || 'Não informado'} (${formData.segment})\n` +
       `🎯 *Momento:* ${stageMap[formData.projectStage] || formData.projectStage}\n` +
-      `💡 *O que realmente preciso:* ${formData.biggestNeed || 'Quero entender as possibilidades'}\n\n` +
-      `Poderiam me orientar com os próximos passos?`
+      `💡 *O que preciso:* ${formData.biggestNeed || 'Gostaria de entender as opções sob medida'}\n\n` +
+      `Gostaria de dar o próximo passo.`
     );
 
-    // Friendly placeholder support contact
-    return `https://wa.me/5511999999999?text=${text}`;
+    return `https://wa.me/${contactConfig.whatsappNumber}?text=${text}`;
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    if (isSubmitted) {
+      setIsSubmitted(false);
+      setFormData({
+        name: '',
+        businessName: '',
+        segment: 'comercio',
+        contactMethod: 'whatsapp',
+        contactValue: '',
+        biggestNeed: '',
+        projectStage: 'rodando'
+      });
+    }
   };
 
   return (
-    <section id="contato" className="py-20 sm:py-28 bg-[#FFFFFF] relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-start">
-          {/* Left Column: Brand Context & Warm Invitation */}
-          <div className="lg:col-span-5 space-y-6">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5A93B]/15 text-[#8F6413] text-xs font-bold uppercase tracking-wider">
-              <span>Primeiro Passo</span>
+    <>
+      <section id="diagnostico-final" className="py-16 sm:py-24 bg-[#FFFFFF] relative scroll-mt-16 border-t border-[#EAE6DF]">
+        <div id="contato" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* End of Page Clean Invitation Card */}
+          <div className="max-w-3xl mx-auto text-center space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1E3A47]/10 text-[#1E3A47] text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-[#D99B26]" />
+              <span>Diagnóstico Sem Compromisso</span>
             </div>
 
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-extrabold text-[#1A1A1A] tracking-tight">
-              Vamos descobrir o que seu negócio{' '}
-              <span className="text-[#D99B26]">realmente precisa?</span>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-extrabold text-[#1A1A1A] tracking-tight">
+              Pronto para Dar o Próximo Passo no Seu Negócio?
             </h2>
 
-            <p className="text-base text-[#4A4A48] leading-relaxed">
-              Sem compromisso e sem apresentações corporativas de 50 páginas. Você nos conta onde o
-              sapato aperta e nós desenhamos uma rota simples, viável e com preço honesto.
+            <p className="text-sm sm:text-base text-[#555555] max-w-xl mx-auto leading-relaxed">
+              Compartilhe sua ideia ou desafio atual. Analisamos sua necessidade com sigilo absoluto e retornamos com uma orientação prática, humanizada e sob medida.
             </p>
 
-            {/* Guarantees Box */}
-            <div className="p-6 rounded-2xl bg-[#F9F9F8] border border-[#E8E8E5] space-y-4">
-              <h3 className="text-sm font-bold text-[#1A1A1A] uppercase tracking-wide">
-                Nosso compromisso com você:
-              </h3>
-
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center shrink-0 mt-0.5">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-[#1A1A1A]">Resposta em até 24h úteis</p>
-                  <p className="text-xs text-[#666666]">
-                    Falamos diretamente com você no WhatsApp ou e-mail de forma rápida.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-[#1E3A47]/10 text-[#1E3A47] flex items-center justify-center shrink-0 mt-0.5">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-[#1A1A1A]">Proposta transparente</p>
-                  <p className="text-xs text-[#666666]">
-                    Sem custos ocultos. Cada ferramenta sugerida terá um propósito claro.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center shrink-0 mt-0.5">
-                  <HelpCircle className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-[#1A1A1A]">Diagnóstico honesto</p>
-                  <p className="text-xs text-[#666666]">
-                    Se uma solução gratuita já resolver o seu caso, nós te diremos isso.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Direct Contact info */}
-            <div className="pt-2 text-xs text-[#666666] space-y-2">
-              <p className="font-semibold text-[#1A1A1A]">Prefere falar direto por mensagem?</p>
-              <div className="flex flex-wrap items-center gap-4">
-                <a
-                  href="https://wa.me/5511999999999"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-[#1E3A47] hover:text-[#D99B26] font-medium transition-colors"
-                >
-                  <Phone className="w-3.5 h-3.5 text-[#D99B26]" />
-                  <span>WhatsApp: (11) 99999-9999</span>
-                </a>
-                <a
-                  href="mailto:contato@beeginning4you.com.br"
-                  className="inline-flex items-center gap-1.5 text-[#1E3A47] hover:text-[#D99B26] font-medium transition-colors"
-                >
-                  <Mail className="w-3.5 h-3.5 text-[#D99B26]" />
-                  <span>contato@beeginning4you.com.br</span>
-                </a>
-              </div>
+            <div className="pt-3 flex justify-center">
+              <button
+                id="btn-pedir-diagnostico-rapido"
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex items-center gap-2 px-8 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 text-[#1A1A1A] text-sm sm:text-base font-bold shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
+              >
+                <span>Pedir Diagnóstico Rápido</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </button>
             </div>
           </div>
+        </div>
+      </section>
 
-          {/* Right Column: Friendly Form */}
-          <div className="lg:col-span-7">
-            <div className="bg-[#F9F9F8] border border-[#E5E5E2] rounded-2xl p-6 sm:p-10 shadow-xs relative">
-              {isSubmitted ? (
-                <div className="py-8 text-center space-y-5 animate-fadeIn">
-                  <div className="w-16 h-16 rounded-full bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center mx-auto">
-                    <CheckCircle2 className="w-10 h-10 text-[#D99B26]" />
-                  </div>
+      {/* Formulário de Contato & Diagnóstico (Exibido apenas ao clicar em Pedir Diagnóstico Rápido) */}
+      {isModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-xs overflow-y-auto animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative w-full max-w-2xl bg-white rounded-2xl sm:rounded-3xl border border-[#E5E5E2] p-5 sm:p-8 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={handleCloseModal}
+              className="absolute top-4 right-4 p-2 text-[#777777] hover:text-[#1A1A1A] hover:bg-[#F2F2EF] rounded-xl transition-colors cursor-pointer"
+              aria-label="Fechar formulário de contato"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-                  <h3 className="text-2xl font-display font-black text-[#1A1A1A]">
-                    Mensagem recebida com sucesso!
-                  </h3>
+            {/* Modal Header */}
+            <div className="border-b border-[#EAEAE7] pb-4 mb-5 pr-8">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#1E3A47]/8 text-[#1E3A47] text-[11px] font-bold uppercase tracking-wider">
+                  <Sparkles className="w-3 h-3 text-[#D99B26]" />
+                  <span>Diagnóstico Sob Medida</span>
+                </span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#136C35] bg-[#25D366]/10 px-2.5 py-0.5 rounded-full">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#1EBE5D]" />
+                  <span>Sigilo & LGPD</span>
+                </span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold font-display text-[#1A1A1A]">
+                Formulário de Contato & Diagnóstico Rápido
+              </h3>
+              <p className="text-xs text-[#666666] mt-0.5">
+                Preencha os campos abaixo. Seus dados são salvos diretamente em nosso sistema com proteção integral.
+              </p>
+            </div>
 
-                  <p className="text-sm text-[#555555] max-w-md mx-auto leading-relaxed">
-                    Obrigado pelo seu contato, <strong>{formData.name || 'Empreendedor'}</strong>!
-                    Já começamos a analisar a sua situação para preparar um retorno objetivo e acolhedor.
+            {isSubmitted ? (
+              <div className="py-6 px-4 text-center space-y-4 animate-fadeIn">
+                <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <div className="space-y-1.5 max-w-md mx-auto">
+                  <h4 className="text-lg font-bold text-[#1A1A1A]">
+                    Diagnóstico Recebido com Sucesso!
+                  </h4>
+                  <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
+                    Obrigado, <strong className="text-[#1A1A1A]">{formData.name}</strong>. Nossa equipe já registrou a sua demanda e entrará em contato em breve através do canal informado ({formData.contactValue}).
                   </p>
+                </div>
 
-                  <div className="p-4 rounded-xl bg-white border border-[#E5E5E2] text-xs text-left max-w-md mx-auto space-y-1">
-                    <span className="font-bold text-[#1E3A47]">Resumo do que você enviou:</span>
-                    <p className="text-[#444444]">
-                      <strong>Negócio:</strong> {formData.businessName || 'Em planejamento'}
-                    </p>
-                    <p className="text-[#444444] line-clamp-2">
-                      <strong>Desafio:</strong> {formData.biggestNeed}
-                    </p>
-                  </div>
+                <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-2.5">
+                  <a
+                    href={generateWhatsAppUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white text-xs font-bold shadow-sm transition-all"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    <span>Falar agora no WhatsApp</span>
+                  </a>
 
-                  {/* Immediate WhatsApp jump option */}
-                  <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3">
-                    <a
-                      href={generateWhatsAppUrl()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white text-xs font-bold shadow-xs transition-colors"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>Agilizar atendimento no WhatsApp</span>
-                    </a>
-
+                  {onOpenMeeting && (
                     <button
                       type="button"
                       onClick={() => {
-                        setIsSubmitted(false);
-                        setFormData({
-                          name: '',
-                          businessName: '',
-                          segment: 'comercio',
-                          contactMethod: 'whatsapp',
-                          contactValue: '',
-                          biggestNeed: '',
-                          projectStage: 'rodando'
-                        });
+                        handleCloseModal();
+                        onOpenMeeting();
                       }}
-                      className="w-full sm:w-auto px-4 py-3 rounded-xl bg-white border border-[#D5D5D0] text-[#444444] hover:text-[#1A1A1A] text-xs font-semibold transition-colors"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-semibold transition-all cursor-pointer"
                     >
-                      Enviar outra mensagem
+                      <Video className="w-4 h-4" />
+                      <span>Agendar no Google Meet</span>
                     </button>
-                  </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="w-full sm:w-auto px-4 py-2.5 text-xs text-[#666666] hover:text-[#1A1A1A] transition-colors cursor-pointer"
+                  >
+                    Fechar
+                  </button>
                 </div>
-              ) : (
-                <form id="contact-budget-form" onSubmit={handleSubmit} className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Name */}
-                    <div>
-                      <label
-                        htmlFor="input-name"
-                        className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1.5"
-                      >
-                        Seu Nome *
-                      </label>
-                      <input
-                        type="text"
-                        id="input-name"
-                        name="name"
-                        required
-                        value={formData.name}
-                        onChange={handleChange}
-                        placeholder="Como você prefere ser chamado?"
-                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/30 text-sm text-[#1A1A1A] placeholder-[#999999] outline-none transition-all"
-                      />
-                    </div>
-
-                    {/* Business Name */}
-                    <div>
-                      <label
-                        htmlFor="input-business"
-                        className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1.5"
-                      >
-                        Nome do Negócio ou Marca
-                      </label>
-                      <input
-                        type="text"
-                        id="input-business"
-                        name="businessName"
-                        value={formData.businessName}
-                        onChange={handleChange}
-                        placeholder="Ex: Confeitaria Doce Mel (ou ainda no papel)"
-                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/30 text-sm text-[#1A1A1A] placeholder-[#999999] outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Segment */}
-                    <div>
-                      <label
-                        htmlFor="select-segment"
-                        className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1.5"
-                      >
-                        Segmento de Atuação
-                      </label>
-                      <select
-                        id="select-segment"
-                        name="segment"
-                        value={formData.segment}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/30 text-sm text-[#1A1A1A] outline-none transition-all"
-                      >
-                        <option value="comercio">Comércio Local / Varejo</option>
-                        <option value="servicos">Prestação de Serviços / Consultoria</option>
-                        <option value="alimentacao">Alimentação &amp; Confeitaria</option>
-                        <option value="marca-autoral">Marca Autoral / Artesanato</option>
-                        <option value="saude">Saúde &amp; Estética</option>
-                        <option value="outro">Outro ramo</option>
-                      </select>
-                    </div>
-
-                    {/* Stage */}
-                    <div>
-                      <label
-                        htmlFor="select-stage"
-                        className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1.5"
-                      >
-                        Momento Atual
-                      </label>
-                      <select
-                        id="select-stage"
-                        name="projectStage"
-                        value={formData.projectStage}
-                        onChange={handleChange}
-                        className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/30 text-sm text-[#1A1A1A] outline-none transition-all"
-                      >
-                        <option value="ideia">Ideia que quero tirar do papel</option>
-                        <option value="rodando">Já tenho o negócio e quero melhorar</option>
-                        <option value="urgente">Preciso organizar com urgência</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Contact Preferred */}
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Name */}
                   <div>
                     <label
-                      htmlFor="input-contact"
-                      className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1.5"
+                      htmlFor="diag-input-name"
+                      className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1"
                     >
-                      WhatsApp ou E-mail para retorno *
+                      Seu Nome *
                     </label>
                     <input
                       type="text"
-                      id="input-contact"
+                      id="diag-input-name"
+                      name="name"
+                      required
+                      value={formData.name}
+                      onChange={handleChange}
+                      placeholder="Como você prefere ser chamado(a)?"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all"
+                    />
+                  </div>
+
+                  {/* Business Name */}
+                  <div>
+                    <label
+                      htmlFor="diag-input-business"
+                      className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1"
+                    >
+                      Nome do Negócio ou Projeto
+                    </label>
+                    <input
+                      type="text"
+                      id="diag-input-business"
+                      name="businessName"
+                      value={formData.businessName}
+                      onChange={handleChange}
+                      placeholder="Ex: Meu Negócio (ou 'Ainda no início')"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* Contact Preferred */}
+                  <div>
+                    <label
+                      htmlFor="diag-input-contact"
+                      className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1"
+                    >
+                      WhatsApp ou E-mail para Retorno *
+                    </label>
+                    <input
+                      type="text"
+                      id="diag-input-contact"
                       name="contactValue"
                       required
                       value={formData.contactValue}
                       onChange={handleChange}
-                      placeholder="Ex: (11) 98765-4321 ou seuemail@exemplo.com"
-                      className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/30 text-sm text-[#1A1A1A] placeholder-[#999999] outline-none transition-all"
+                      placeholder="Ex: (11) 98765-4321 ou seu@email.com"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all"
                     />
                   </div>
 
-                  {/* The Core Question: What does this business really need? */}
+                  {/* Project Stage */}
                   <div>
                     <label
-                      htmlFor="textarea-biggest-need"
-                      className="block text-xs font-bold uppercase tracking-wider text-[#1E3A47] mb-1.5"
+                      htmlFor="diag-select-stage"
+                      className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1"
                     >
-                      O que o seu negócio realmente precisa hoje? *
+                      Em Qual Momento Você Está?
                     </label>
-                    <textarea
-                      id="textarea-biggest-need"
-                      name="biggestNeed"
-                      rows={4}
-                      required
-                      value={formData.biggestNeed}
+                    <select
+                      id="diag-select-stage"
+                      name="projectStage"
+                      value={formData.projectStage}
                       onChange={handleChange}
-                      placeholder="Conte com suas palavras: o que está tomando seu tempo hoje? Qual processo você gostaria de ver rodando sozinho ou mais organizado? Não precisa se preocupar em usar termos técnicos."
-                      className="w-full px-4 py-3 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/30 text-sm text-[#1A1A1A] placeholder-[#999999] outline-none transition-all resize-y"
-                    />
-                    <p className="text-[11px] text-[#777777] mt-1.5">
-                      Dica: fale sobre sua rotina real (ex: "perco tempo no WhatsApp", "preciso de um site simples", "planilhas me deixam perdido").
-                    </p>
-                  </div>
-
-                  {/* Submit CTA */}
-                  <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    <p className="text-[11px] text-[#666666]">
-                      🔒 Seus dados ficam 100% seguros. Zero spam.
-                    </p>
-
-                    <button
-                      type="submit"
-                      id="btn-submit-budget"
-                      disabled={isSubmitting}
-                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                      className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all cursor-pointer"
                     >
-                      {isSubmitting ? (
-                        <span>Enviando...</span>
-                      ) : (
-                        <>
-                          <span>Pedir Diagnóstico Prático</span>
-                          <Send className="w-4 h-4" />
-                        </>
-                      )}
-                    </button>
+                      <option value="ideia">Ideia que quero tirar do papel</option>
+                      <option value="rodando">Já tenho o negócio e quero melhorar</option>
+                      <option value="urgente">Preciso organizar com urgência</option>
+                    </select>
                   </div>
-                </form>
-              )}
-            </div>
+                </div>
+
+                {/* The Core Question: What does this business really need? */}
+                <div>
+                  <label
+                    htmlFor="diag-textarea-need"
+                    className="block text-xs font-bold uppercase tracking-wider text-[#1E3A47] mb-1"
+                  >
+                    O que o seu negócio realmente precisa hoje? *
+                  </label>
+                  <textarea
+                    id="diag-textarea-need"
+                    name="biggestNeed"
+                    rows={3}
+                    required
+                    value={formData.biggestNeed}
+                    onChange={handleChange}
+                    placeholder="Conte com suas palavras: qual processo está tomando seu tempo? Precisa de controle financeiro, cálculo de preço, plataforma web ou organização de agenda?"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all resize-y"
+                  />
+                  <p className="text-[11px] text-[#777777] mt-1">
+                    Não se preocupe com termos técnicos. Fale da sua rotina real que nós desenhamos a solução ideal.
+                  </p>
+                </div>
+
+                {/* Mandatory Term of Confidentiality Checkbox */}
+                <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#E2DDD5]">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      required
+                      defaultChecked
+                      className="mt-0.5 w-4 h-4 rounded text-[#D99B26] focus:ring-[#D99B26] border-[#D5D5D0] cursor-pointer"
+                    />
+                    <span className="text-xs text-[#555555] leading-relaxed">
+                      Concordo com o <strong className="text-[#1A1A1A]">Compromisso de Sigilo e LGPD</strong> da Beeginning 4 you. Minhas informações e ideias serão tratadas com total confidencialidade e exclusivamente para este atendimento.
+                    </span>
+                  </label>
+                </div>
+
+                {/* Submit CTA - Explicitly labeled "Enviar" */}
+                <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                  <p className="text-[11px] text-[#666666]">
+                    🔒 Seus dados ficam protegidos em conformidade com a LGPD (Lei 13.709/2018).
+                  </p>
+
+                  <button
+                    type="submit"
+                    id="btn-submit-diagnostic"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl text-sm font-bold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                  >
+                    {isSubmitting ? (
+                      <span>Enviando...</span>
+                    ) : (
+                      <>
+                        <span>Enviar</span>
+                        <Send className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
-      </div>
-    </section>
+      )}
+    </>
   );
 }

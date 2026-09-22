@@ -244,16 +244,6 @@ export default function Philosophy() {
             </div>
           </div>
         </div>
-
-        {/* Signature Callout from reference: "Seu negócio começa aqui..." in Baguet Script */}
-        <div className="mt-8 flex justify-end px-2 sm:px-6">
-          <div className="inline-flex items-center gap-3">
-            <span className="w-12 h-px bg-[#D99B26]/60" />
-            <p className="font-baguet text-3xl sm:text-4xl lg:text-5xl text-[#181B1E] tracking-normal">
-              Seu negócio começa aqui...
-            </p>
-          </div>
-        </div>
       </div>
     </section>
   );

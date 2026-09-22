@@ -1,6 +1,7 @@
 import {
   PhilosophyStep,
   SolutionItem,
+  RealProjectExample,
   AudienceProfile,
   UseCaseStory,
   DiagnosticOption
@@ -45,7 +46,141 @@ export const PHILOSOPHY_STEPS: PhilosophyStep[] = [
   }
 ];
 
+export const REAL_PROJECT_EXAMPLES: RealProjectExample[] = [
+  {
+    id: 'gestao-financeira',
+    title: 'Gestão Financeira Descomplicada & Fluxo de Caixa',
+    badge: 'Projeto Real • Finanças Enxutas',
+    tagline: 'Controle de entradas, saídas, previsão de lucro e alertas sem planilhas confusas',
+    iconName: 'Wallet',
+    challenge:
+      'Empreendedores perdiam horas tentando consolidar extratos bancários, cadernos e planilhas quebradas, sem saber com precisão a margem de lucro líquida no final do mês ou quanto poderiam reinvestir.',
+    solution:
+      'Desenvolvemos um painel financeiro visual e limpo, acessível pelo celular e computador, que registra receitas e despesas em 2 toques, gera relatórios automáticos e prevê o fluxo de caixa com zero complicações.',
+    highlights: [
+      'Registro ultrarrápido de entradas e saídas pelo celular',
+      'Painel visual com faturamento real, custos fixos e margem líquida',
+      'Categorização automática de despesas sem jargões contábeis',
+      'Alertas de contas a pagar e vencimentos com antecedência',
+      'Exportação instantânea para o contador com apenas um clique'
+    ],
+    resultsNote: 'Total clareza sobre o destino de cada centavo e paz mental no fechamento do mês.'
+  },
+  {
+    id: 'calculo-preco-inteligente',
+    title: 'Cálculo de Preço Inteligente & Margem Real',
+    badge: 'Projeto Real • Precificação Segura',
+    tagline: 'Formação de preços precisa considerando custos fixos, insumos, impostos e lucro desejado',
+    iconName: 'Calculator',
+    challenge:
+      'Muitos negócios cobravam valores baseados no achismo ou no preço da concorrência, descobrindo tarde demais que estavam tendo prejuízo oculto em cada venda por ignorar custos variáveis e horas produtivas.',
+    solution:
+      'Criamos uma calculadora inteligente sob medida onde o empreendedor insere os insumos ou serviços e o sistema calcula instantaneamente o preço de venda ideal, sugerindo faixas de desconto e ponto de equilíbrio.',
+    highlights: [
+      'Cálculo automático de custo de insumos, embalagens e tempo de produção',
+      'Simulação de taxas de maquininha, comissões e impostos em tempo real',
+      'Sugestão inteligente de preço mínimo, preço médio e margem ideal',
+      'Tabela dinâmica de preços exportável para orçamentos e cardápios',
+      'Eliminação total do risco de "pagar para trabalhar"'
+    ],
+    resultsNote: 'Aumento imediato de até 28% na rentabilidade com preços justos e sustentáveis.'
+  },
+  {
+    id: 'desenvolvimento-desta-pagina',
+    title: 'Desenvolvimento Desta Plataforma Web (Beeginning 4 you)',
+    badge: 'Projeto Real • Plataforma Autoral',
+    tagline: 'Arquitetura digital refinada, agendamento de reuniões, compromisso LGPD e banco de demandas',
+    iconName: 'Globe',
+    challenge:
+      'Apresentar a proposta de valor humanizada da Beeginning 4 you através de uma interface elegante, de alta velocidade e com governança de dados: sem formulários pesados, integrando agendamento Google Calendar e painel administrativo de controle de demandas.',
+    solution:
+      'Concepção e desenvolvimento completo desta aplicação moderna em React e TypeScript, dotada de compromisso de sigilo e LGPD, agendamento de reuniões ao vivo e sistema interno de gestão para o administrador.',
+    highlights: [
+      'Design minimalista, tipografia artesanal vetorizada e identidade autoral',
+      'Compromisso rigoroso de sigilo comercial e conformidade integral com a LGPD',
+      'Agendamento inteligente sincronizado ao Google Agenda e Google Meet',
+      'Painel administrativo discreto com controle de formulários e personalização de contatos',
+      'Velocidade de carregamento instantânea em dispositivos móveis'
+    ],
+    resultsNote: 'Uma presença digital que transmite credibilidade, acolhimento e tecnologia sob medida.'
+  },
+  {
+    id: 'ecommerce-automatizado',
+    title: 'Plataforma de E-commerce Completa e Automatizada',
+    badge: 'Projeto Real • Loja Própria',
+    tagline: 'Operação digital enxuta, segura e de alta conversão sem sistemas inchados',
+    iconName: 'ShoppingBag',
+    challenge:
+      'Criar uma loja virtual ágil, com identidade visual própria (tipografia exclusiva vetorizada), integrada a múltiplos meios de pagamento (como gateways e links diretos), calculadora de frete e automação de e-mails transacionais.',
+    solution:
+      'Uma operação digital enxuta, segura e pronta para receber pedidos, processar pagamentos de forma fluida e encantar os clientes desde o primeiro clique.',
+    highlights: [
+      'Identidade visual própria com tipografia exclusiva vetorizada',
+      'Múltiplos meios de pagamento (gateways integrados e links diretos)',
+      'Calculadora de frete dinâmica e transparente',
+      'Automação completa de e-mails transacionais (pedido, pagamento e envio)',
+      'Plataforma ágil, segura e livre de taxas ou plataformas pesadas'
+    ],
+    resultsNote: 'Engrenagem comercial rodando macia, do primeiro clique até a entrega.'
+  },
+  {
+    id: 'sistema-gestao-agenda',
+    title: 'Sistemas Web Interativos e Gestão de Alunos/Agenda',
+    badge: 'Projeto Real • Sistema Web',
+    tagline: 'Gestão inteligente de rotinas, painéis separados e sincronização em tempo real',
+    iconName: 'Cpu',
+    challenge:
+      'Desenvolver uma aplicação web sob medida para gerenciamento de serviços e rotinas, contando com painéis separados para clientes e prestadores, além de sincronização direta de horários e agendamentos.',
+    solution:
+      'Um ambiente digital inteligente e integrado que simplifica a rotina operacional, elimina processos manuais e eleva a experiência do usuário final.',
+    highlights: [
+      'Painéis dedicados e intuitivos para clientes e prestadores',
+      'Sincronização direta de horários e agendamentos sem atritos',
+      'Gestão centralizada de alunos/clientes, presenças e histórico',
+      'Eliminação completa de controles manuais e planilhas paralelas',
+      'Experiência do usuário final refinada e acolhedora'
+    ],
+    resultsNote: 'Rotina operacional descomplicada para você focar no que faz de melhor.'
+  }
+];
+
 export const SOLUTIONS: SolutionItem[] = [
+  {
+    id: 'ecommerce-completo',
+    title: 'Plataforma de E-commerce Completa e Automatizada',
+    shortDesc: 'Operação digital enxuta, segura e pronta para receber pedidos, processar pagamentos de forma fluida e encantar os clientes desde o primeiro clique.',
+    badge: 'Projeto Real • E-commerce',
+    iconName: 'ShoppingBag',
+    practicalPain: 'Criar uma loja virtual ágil, com identidade visual própria (tipografia exclusiva vetorizada), integrada a múltiplos meios de pagamento (como gateways e links diretos), calculadora de frete e automação de e-mails transacionais.',
+    ourSolution: 'Uma operação digital enxuta, segura e pronta para receber pedidos, processar pagamentos de forma fluida e encantar os clientes desde o primeiro clique.',
+    features: [
+      'Identidade visual própria e tipografia exclusiva vetorizada',
+      'Múltiplos meios de pagamento (gateways e links diretos)',
+      'Calculadora de frete integrada em tempo real',
+      'Automação de e-mails transacionais e notificações',
+      'Zero inchaço operacional ou taxas abusivas por transação'
+    ],
+    estimatedDelivery: '10 a 20 dias úteis',
+    idealFor: 'Marcas autorais, pequenas confecções, lojistas e criadores que desejam canal próprio e profissional.'
+  },
+  {
+    id: 'sistemas-web-agenda',
+    title: 'Sistemas Web Interativos e Gestão de Alunos/Agenda',
+    shortDesc: 'Um ambiente digital inteligente e integrado que simplifica a rotina operacional, elimina processos manuais e eleva a experiência do usuário final.',
+    badge: 'Projeto Real • Sistema Web',
+    iconName: 'Cpu',
+    practicalPain: 'Desenvolver uma aplicação web sob medida para gerenciamento de serviços e rotinas, contando com painéis separados para clientes e prestadores, além de sincronização direta de horários e agendamentos.',
+    ourSolution: 'Um ambiente digital inteligente e integrado que simplifica a rotina operacional, elimina processos manuais e eleva a experiência do usuário final.',
+    features: [
+      'Painéis separados para clientes e prestadores',
+      'Sincronização direta de horários e agendamentos',
+      'Gestão de rotinas, histórico de atendimentos e alunos',
+      'Eliminação de processos manuais e retrabalho',
+      'Acesso seguro de qualquer dispositivo celular ou PC'
+    ],
+    estimatedDelivery: '12 a 25 dias úteis',
+    idealFor: 'Professores, escolas, estúdios, consultorias e negócios de serviços que precisam de organização precisa.'
+  },
   {
     id: 'presenca-digital',
     title: 'Landing Pages & Presença Digital Sob Medida',
@@ -82,7 +217,7 @@ export const SOLUTIONS: SolutionItem[] = [
   },
   {
     id: 'paineis-descomplicados',
-    title: 'Painéis de Gestão sem Sofrimento',
+    title: 'Painéis de Gestão Enxutos sem Sofrimento',
     shortDesc: 'Apenas o que você precisa ver: vendas do dia, clientes fiéis e produtos mais pedidos, sem planilhas confusas.',
     badge: 'Clareza nos Negócios',
     iconName: 'BarChart3',
@@ -96,40 +231,6 @@ export const SOLUTIONS: SolutionItem[] = [
     ],
     estimatedDelivery: '7 a 15 dias úteis',
     idealFor: 'Lojistas, comércios locais e pequenas confecções que abandonaram os ERPs complexos e caros.'
-  },
-  {
-    id: 'catalogos-vendas',
-    title: 'Catálogos Digitais & Mini Lojas Inteligentes',
-    shortDesc: 'Venda seus produtos de forma direta, bonita e sem ter que pagar taxas abusivas por transação.',
-    badge: 'Vendas Diretas',
-    iconName: 'ShoppingBag',
-    practicalPain: 'Plataformas de e-commerce tradicionais cobram mensalidades caras e são difíceis demais para quem tem poucos produtos.',
-    ourSolution: 'Uma vitrine digital ágil onde o cliente escolhe os itens com facilidade e envia o carrinho organizado diretamente no seu WhatsApp.',
-    features: [
-      'Carrinho intuitivo com cálculo de frete ou retirada',
-      'Atualização de preços e estoque em segundos',
-      'Sem taxas percentuais sobre suas vendas',
-      'Funciona perfeitamente em 3G/4G'
-    ],
-    estimatedDelivery: '7 a 12 dias úteis',
-    idealFor: 'Confeitarias, marcas autorais, floriculturas, bazares e pequenos restaurantes.'
-  },
-  {
-    id: 'ferramentas-sob-medida',
-    title: 'Ferramentas & Sistemas Sob Medida',
-    shortDesc: 'Quando nenhuma solução de prateleira atende a singularidade do seu método de trabalho.',
-    badge: 'Exclusivo',
-    iconName: 'Cpu',
-    practicalPain: 'Você gasta com 3 ferramentas diferentes que não conversam entre si e sua equipe vive retrabalhando.',
-    ourSolution: 'Sentamos com você, mapeamos seu processo e desenvolvemos a engrenagem exata para resolver o problema específico.',
-    features: [
-      'Desenvolvido para caber no seu orçamento',
-      'Treinamento prático de uso da ferramenta',
-      'Código limpo, moderno e sustentável',
-      'Suporte humano e contínuo'
-    ],
-    estimatedDelivery: 'Consulte escopo',
-    idealFor: 'Negócios com operações particulares que necessitam de diferenciação competitiva.'
   },
   {
     id: 'integracoes-processos',

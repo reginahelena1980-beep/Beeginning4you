@@ -13,7 +13,9 @@ import {
   Clock,
   HelpCircle,
   X,
-  Sparkles
+  Sparkles,
+  CheckCircle2,
+  Workflow
 } from 'lucide-react';
 
 interface SolutionsProps {
@@ -45,89 +47,153 @@ export default function Solutions({ onSelectSolutionForContact }: SolutionsProps
 
   return (
     <section id="solucoes" className="py-20 sm:py-28 bg-[#F9F9F8] relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section Header */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 sm:space-y-20">
+        
+        {/* Section Header & Humanized Summary */}
         <div className="max-w-3xl mx-auto text-center space-y-4">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1E3A47]/10 text-[#1E3A47] text-xs font-bold uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5 text-[#D99B26]" />
             <span>O Que Fazemos</span>
           </div>
 
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-extrabold text-[#1A1A1A] tracking-tight">
-            Ferramentas Digitais Feitas para o Dia a Dia
+            Soluções Digitais Sob Medida, Ágeis e Sem Sistemas Inchados
           </h2>
 
-          <p className="text-base sm:text-lg text-[#555555] leading-relaxed">
-            Nada de sistemas inchados ou custos surpresa. Desenvolvemos a peça que falta para a sua
-            engrenagem rodar macia e você focar no que faz de melhor.
+          <p className="text-base sm:text-lg text-[#4A4A48] leading-relaxed">
+            Desenvolvemos a peça que falta para a engrenagem do seu negócio rodar macia e você focar
+            no que faz de melhor. Criamos soluções digitais leves, práticas e livres da complexidade
+            de plataformas pesadas e custos surpresa.
           </p>
         </div>
 
-        {/* Solutions Grid */}
-        <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-          {SOLUTIONS.map((item) => (
-            <div
-              key={item.id}
-              id={`solution-card-${item.id}`}
-              className="group bg-white rounded-2xl border border-[#E8E8E5] hover:border-[#D99B26] p-7 flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300"
+        {/* Highlight Banner: Lean Philosophy & No-Bloat Commitment */}
+        <div className="bg-white rounded-2xl border border-[#E8E8E5] p-6 sm:p-9 shadow-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center mb-3">
+                <Workflow className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-[#1A1A1A]">Engrenagem Macia</h3>
+              <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
+                Tecnologia boa é a que se molda ao seu ritmo de trabalho — e não o contrário. Desenhamos
+                cada fluxo para eliminar gargalos e devolver seu tempo.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-[#1E3A47]/10 text-[#1E3A47] flex items-center justify-center mb-3">
+                <Zap className="w-5 h-5 text-[#D99B26]" />
+              </div>
+              <h3 className="text-base font-bold text-[#1A1A1A]">Zero Sistemas Inchados</h3>
+              <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
+                Nada de telas poluídas com 80 botões dos quais você só usa três. Construímos apenas o
+                essencial que gera resultado concreto para o seu caixa.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-xl bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center mb-3">
+                <CheckCircle2 className="w-5 h-5 text-[#D99B26]" />
+              </div>
+              <h3 className="text-base font-bold text-[#1A1A1A]">Foco no Que Faz de Melhor</h3>
+              <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
+                Menos tempo perdido com mensagens duplicadas, anotações perdidas ou planilhas confusas.
+                Você atende seus clientes, e a engrenagem roda suave.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Modular Solutions Catalog */}
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E8E8E5] pb-4">
+            <div className="max-w-2xl">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#1E3A47] block mb-1">
+                Catálogo de Serviços Digitais
+              </span>
+              <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-[#1A1A1A]">
+                Ferramentas Feitas para o Seu Dia a Dia
+              </h3>
+              <p className="text-xs sm:text-sm text-[#555555] mt-1.5">
+                De lojas virtuais completas a integrações e automações pontuais, escolha o módulo ideal para a sua rotina:
+              </p>
+            </div>
+
+            <a
+              href="#historias"
+              onClick={(e) => {
+                e.preventDefault();
+                const el = document.querySelector('#historias');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1E3A47] hover:text-[#D99B26] transition-colors whitespace-nowrap self-start sm:self-end"
             >
-              <div>
-                {/* Top Badge & Icon */}
-                <div className="flex items-center justify-between mb-5">
-                  <div className="w-12 h-12 rounded-xl bg-[#F4F4F2] group-hover:bg-[#E5A93B]/20 text-[#1E3A47] group-hover:text-[#8F6413] flex items-center justify-center transition-colors">
-                    {renderIcon(item.iconName)}
+              <span>Ver projetos reais desenvolvidos</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            {SOLUTIONS.map((item) => (
+              <div
+                key={item.id}
+                id={`solution-card-${item.id}`}
+                className="group bg-white rounded-2xl border border-[#E8E8E5] hover:border-[#D99B26] p-7 flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300"
+              >
+                <div>
+                  {/* Top Badge & Icon */}
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="w-12 h-12 rounded-xl bg-[#F4F4F2] group-hover:bg-[#E5A93B]/20 text-[#1E3A47] group-hover:text-[#8F6413] flex items-center justify-center transition-colors">
+                      {renderIcon(item.iconName)}
+                    </div>
+
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#1E3A47]/8 text-[#1E3A47] group-hover:bg-[#E5A93B]/20 group-hover:text-[#8F6413] transition-colors whitespace-nowrap">
+                      {item.badge}
+                    </span>
                   </div>
 
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#1E3A47]/8 text-[#1E3A47] group-hover:bg-[#E5A93B]/20 group-hover:text-[#8F6413] transition-colors">
-                    {item.badge}
-                  </span>
+                  {/* Title & Description */}
+                  <h4 className="text-lg sm:text-xl font-bold font-display text-[#1A1A1A] group-hover:text-[#1E3A47] transition-colors mb-2.5">
+                    {item.title}
+                  </h4>
+
+                  <p className="text-xs sm:text-sm text-[#555555] leading-relaxed mb-5">
+                    {item.shortDesc}
+                  </p>
+
+                  {/* Practical Features checklist preview */}
+                  <div className="space-y-2 border-t border-[#F0F0EE] pt-4 mb-5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#888888] block">
+                      Benefícios práticos:
+                    </span>
+                    {item.features.slice(0, 3).map((feature, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-xs text-[#333333]">
+                        <Check className="w-3.5 h-3.5 text-[#D99B26] shrink-0" />
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Title & Description */}
-                <h3 className="text-xl font-bold font-display text-[#1A1A1A] group-hover:text-[#1E3A47] transition-colors mb-2.5">
-                  {item.title}
-                </h3>
-
-                <p className="text-xs sm:text-sm text-[#555555] leading-relaxed mb-5">
-                  {item.shortDesc}
-                </p>
-
-                {/* Practical Features checklist preview */}
-                <div className="space-y-2 border-t border-[#F0F0EE] pt-4 mb-5">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#888888] block">
-                    Benefícios práticos:
-                  </span>
-                  {item.features.slice(0, 3).map((feature, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-xs text-[#333333]">
-                      <Check className="w-3.5 h-3.5 text-[#D99B26] shrink-0" />
-                      <span>{feature}</span>
-                    </div>
-                  ))}
+                {/* Bottom Action Area */}
+                {/* Card Action */}
+                <div className="pt-3.5 border-t border-[#F0F0EE] flex items-center justify-between">
+                  <button
+                    type="button"
+                    id={`btn-details-${item.id}`}
+                    onClick={() => setActiveModalSolution(item)}
+                    className="text-xs font-bold text-[#1E3A47] hover:text-[#D99B26] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 text-[#D99B26]" />
+                    <span>Ver na prática</span>
+                  </button>
                 </div>
               </div>
-
-              {/* Bottom Action Area */}
-              <div className="pt-4 border-t border-[#F0F0EE] flex items-center justify-between gap-2">
-                <button
-                  id={`btn-details-${item.id}`}
-                  onClick={() => setActiveModalSolution(item)}
-                  className="text-xs font-bold text-[#1E3A47] hover:text-[#D99B26] inline-flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <HelpCircle className="w-3.5 h-3.5" />
-                  <span>Ver na prática</span>
-                </button>
-
-                <button
-                  id={`btn-choose-${item.id}`}
-                  onClick={() => onSelectSolutionForContact(item.title)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] active:scale-95 transition-all shadow-xs"
-                >
-                  <span>Quero essa</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
+
       </div>
 
       {/* Solution Detail Modal */}
@@ -142,7 +208,7 @@ export default function Solutions({ onSelectSolutionForContact }: SolutionsProps
             <button
               id="close-solution-modal"
               onClick={() => setActiveModalSolution(null)}
-              className="absolute top-5 right-5 p-2 rounded-lg text-[#777777] hover:text-[#1A1A1A] hover:bg-[#F0F0ED] transition-colors"
+              className="absolute top-5 right-5 p-2 rounded-lg text-[#777777] hover:text-[#1A1A1A] hover:bg-[#F0F0ED] transition-colors cursor-pointer"
               aria-label="Fechar detalhes"
             >
               <X className="w-5 h-5" />
@@ -167,16 +233,16 @@ export default function Solutions({ onSelectSolutionForContact }: SolutionsProps
             <div className="space-y-4 my-6 text-sm">
               <div className="p-3.5 rounded-xl bg-[#FFF8EE] border border-[#E5A93B]/30">
                 <span className="text-xs font-bold text-[#8F6413] block mb-1">
-                  A dor comum que isso resolve:
+                  O desafio que isso resolve:
                 </span>
-                <p className="text-xs text-[#444444]">{activeModalSolution.practicalPain}</p>
+                <p className="text-xs text-[#444444] leading-relaxed">{activeModalSolution.practicalPain}</p>
               </div>
 
               <div className="p-3.5 rounded-xl bg-[#F4F8FA] border border-[#1E3A47]/15">
                 <span className="text-xs font-bold text-[#1E3A47] block mb-1">
-                  Como a Beeginning resolve:
+                  A solução Beeginning:
                 </span>
-                <p className="text-xs text-[#333333]">{activeModalSolution.ourSolution}</p>
+                <p className="text-xs text-[#222222] font-medium leading-relaxed">{activeModalSolution.ourSolution}</p>
               </div>
 
               <div>
@@ -198,6 +264,9 @@ export default function Solutions({ onSelectSolutionForContact }: SolutionsProps
                   <Clock className="w-3.5 h-3.5 text-[#D99B26]" />
                   <span>Prazo estimado: <strong>{activeModalSolution.estimatedDelivery}</strong></span>
                 </div>
+                <div className="text-[11px] text-[#777777]">
+                  <span>Ideal para: {activeModalSolution.idealFor}</span>
+                </div>
               </div>
             </div>
 
@@ -206,7 +275,7 @@ export default function Solutions({ onSelectSolutionForContact }: SolutionsProps
               <button
                 type="button"
                 onClick={() => setActiveModalSolution(null)}
-                className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-[#666666] hover:text-[#1A1A1A] transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 text-xs font-semibold text-[#666666] hover:text-[#1A1A1A] transition-colors cursor-pointer"
               >
                 Fechar
               </button>
@@ -218,7 +287,7 @@ export default function Solutions({ onSelectSolutionForContact }: SolutionsProps
                   setActiveModalSolution(null);
                   onSelectSolutionForContact(title);
                 }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] rounded-xl shadow-xs transition-colors"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-bold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] rounded-xl shadow-xs transition-colors cursor-pointer"
               >
                 <span>Solicitar proposta desta solução</span>
                 <ArrowRight className="w-3.5 h-3.5" />

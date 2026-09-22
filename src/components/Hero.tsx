@@ -37,21 +37,14 @@ export default function Hero({ onOpenDiagnostic }: HeroProps) {
               </div>
 
               {/* Minimalist Action Prompt */}
-              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center gap-3">
+              <div className="mt-6 sm:mt-8 flex items-center justify-center">
                 <button
                   id="hero-board-solutions"
-                  onClick={() => scrollToSection('#servicos')}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#181B1E] hover:bg-[#D99B26] text-white hover:text-[#181B1E] text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group"
+                  onClick={() => scrollToSection('#historias')}
+                  className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#181B1E] hover:bg-[#D99B26] text-white hover:text-[#181B1E] text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group"
                 >
                   <span>Nossas Soluções</span>
                   <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
-                </button>
-                <button
-                  id="hero-board-diagnostic"
-                  onClick={onOpenDiagnostic}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-transparent hover:bg-black/5 text-[#181B1E] border border-[#181B1E]/20 text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer active:scale-95"
-                >
-                  <span>Diagnóstico</span>
                 </button>
               </div>
             </div>

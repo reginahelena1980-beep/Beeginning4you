@@ -1,7 +1,20 @@
 import { Infinity, Sparkles, TrendingUp, Compass, Heart, ArrowRight } from 'lucide-react';
 import BeeLogo from './BeeLogo';
 
-export default function AboutUs() {
+interface AboutUsProps {
+  onOpenConversation?: () => void;
+}
+
+export default function AboutUs({ onOpenConversation }: AboutUsProps) {
+  const handleClick = () => {
+    if (onOpenConversation) {
+      onOpenConversation();
+    } else {
+      const el = document.querySelector('#diagnostico-final') || document.querySelector('#contato');
+      el?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <section
       id="quem-somos"
@@ -47,7 +60,7 @@ export default function AboutUs() {
             </h3>
 
             <p className="mt-3 text-sm sm:text-base text-[#55585D] leading-relaxed">
-              Na matemática, o símbolo do <strong>infinito (∞)</strong> representa aquilo que não tem fronteiras ou interrupção. No desenho da nossa abelhinha, as asinhas em formato de infinito e a linha de voo contínua simbolizam que <strong>o início nunca é um ponto final</strong>: é o disparo de um ciclo infinito de melhoria, adaptação e expansão.
+              Na matemática, o símbolo do <strong>infinito (∞)</strong> representa aquilo que não tem fronteiras ou interrupção. No desenho da nossa abelhinha, as asinhas em formato de infinito e a linha de voo contínua simbolizam que o início é o disparo de um ciclo infinito de melhoria, adaptação e expansão.
             </p>
 
             <div className="mt-6 w-full grid grid-cols-2 gap-3 pt-6 border-t border-[#EAE6DF] text-left">
@@ -98,7 +111,7 @@ export default function AboutUs() {
                     2. A Conexão com o Logo: O Traço Contínuo
                   </h4>
                   <p className="mt-2 text-sm sm:text-base text-[#55585D] leading-relaxed">
-                    Repare na linha fluida que sai da palavra <strong>"Bee"</strong> e entra perfeitamente no corpo da abelha: ela reflete a continuidade ininterrupta entre a sua ideia inicial e o futuro do seu negócio. Não há saltos misteriosos; tudo é construído de forma orgânica, passo a passo, sem arestas soltas.
+                    Repare na linha fluida que sai da palavra <strong>"Bee"</strong> e conecta com a abelha: ela reflete a continuidade ininterrupta entre a sua ideia inicial e o futuro do seu negócio. Não há saltos misteriosos; tudo é construído de forma orgânica, passo a passo, sem arestas soltas.
                   </p>
                 </div>
               </div>
@@ -128,13 +141,15 @@ export default function AboutUs() {
                   Pronto para dar o primeiro passo do seu crescimento contínuo?
                 </p>
               </div>
-              <a
-                href="#contato"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#E5A93B] hover:bg-[#D99B26] text-[#181B1E] text-xs font-bold transition-colors shrink-0"
+              <button
+                type="button"
+                id="btn-about-falar-conosco"
+                onClick={handleClick}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#E5A93B] hover:bg-[#D99B26] text-[#181B1E] text-xs font-bold transition-colors shrink-0 cursor-pointer shadow-xs active:scale-95"
               >
                 <span>Falar Conosco</span>
                 <ArrowRight className="w-3.5 h-3.5" />
-              </a>
+              </button>
             </div>
           </div>
         </div>

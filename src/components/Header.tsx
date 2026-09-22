@@ -2,10 +2,10 @@ import { useState, useEffect, type MouseEvent } from 'react';
 import { Menu, X, ArrowRight, Sparkles, MessageCircle } from 'lucide-react';
 
 interface HeaderProps {
-  onOpenDiagnostic: () => void;
+  onOpenConversation: () => void;
 }
 
-export default function Header({ onOpenDiagnostic }: HeaderProps) {
+export default function Header({ onOpenConversation }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -23,8 +23,7 @@ export default function Header({ onOpenDiagnostic }: HeaderProps) {
     { label: 'Filosofia', href: '#filosofia' },
     { label: 'O Que Fazemos', href: '#solucoes' },
     { label: 'Para Quem', href: '#para-quem' },
-    { label: 'Histórias Reais', href: '#historias' },
-    { label: 'Contato', href: '#contato' },
+    { label: 'Projetos Reais', href: '#historias' },
   ];
 
   const handleNavClick = (e: MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -49,7 +48,7 @@ export default function Header({ onOpenDiagnostic }: HeaderProps) {
         <div className="flex items-center justify-between h-16 sm:h-20 w-full">
           {/* Desktop Navigation: Aligned from the left boundary matching the hero panel below */}
           <nav
-            className="hidden lg:flex items-center space-x-0.5 xl:space-x-1 pointer-events-auto -ml-2"
+            className="hidden lg:flex items-center space-x-1 xl:space-x-1.5 pointer-events-auto -ml-2"
             aria-label="Navegação Principal"
           >
             {navLinks.map((link) => (
@@ -58,45 +57,36 @@ export default function Header({ onOpenDiagnostic }: HeaderProps) {
                 href={link.href}
                 id={`nav-link-${link.href.replace('#', '')}`}
                 onClick={(e) => handleNavClick(e, link.href)}
-                className="px-2.5 xl:px-3.5 py-1.5 xl:py-2 text-xs xl:text-sm font-medium text-[#3A3A3A] hover:text-[#1A1A1A] hover:bg-[#EBEBE8]/60 rounded-lg transition-colors whitespace-nowrap"
+                className="px-3 xl:px-4 py-2 text-xs xl:text-sm font-medium text-[#3A3A3A] hover:text-[#1A1A1A] hover:bg-[#EBEBE8]/60 rounded-lg transition-colors whitespace-nowrap"
               >
                 {link.label}
               </a>
             ))}
           </nav>
 
-          {/* CTA Buttons (Desktop) aligned to the right boundary */}
+          {/* CTA Button (Desktop) - Unified Vamos conversar? / Fale Conosco */}
           <div className="hidden sm:flex items-center gap-2 xl:gap-2.5 shrink-0 z-10 -mr-1 sm:mr-0">
             <button
-              id="header-diagnostic-btn"
-              onClick={onOpenDiagnostic}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 xl:px-3.5 xl:py-2 text-xs font-semibold text-[#1E3A47] bg-[#1E3A47]/8 hover:bg-[#1E3A47]/15 rounded-lg transition-colors whitespace-nowrap"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-[#D99B26]" />
-              <span>Diagnóstico Rápido</span>
-            </button>
-
-            <a
               id="header-cta-btn"
-              href="#contato"
-              onClick={(e) => handleNavClick(e, '#contato')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 xl:px-4 xl:py-2 text-xs xl:text-sm font-semibold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 rounded-lg shadow-xs transition-all duration-200 whitespace-nowrap"
+              type="button"
+              onClick={onOpenConversation}
+              className="inline-flex items-center gap-2 px-4 py-2 xl:px-5 xl:py-2.5 text-xs xl:text-sm font-semibold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 rounded-xl shadow-xs transition-all duration-200 whitespace-nowrap cursor-pointer"
             >
               <span>Vamos conversar?</span>
               <ArrowRight className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
-            </a>
+            </button>
           </div>
 
           {/* Mobile Menu Toggle Button */}
           <div className="flex sm:hidden items-center gap-2">
             <button
-              id="mobile-quick-diag-btn"
-              onClick={onOpenDiagnostic}
-              className="p-2 text-[#1E3A47] bg-[#1E3A47]/10 rounded-lg"
-              title="Diagnóstico rápido"
-              aria-label="Abrir diagnóstico rápido"
+              id="mobile-header-conv-btn"
+              onClick={onOpenConversation}
+              className="p-2 text-[#1A1A1A] bg-[#E5A93B] rounded-lg shadow-xs"
+              title="Vamos conversar?"
+              aria-label="Abrir conversa"
             >
-              <Sparkles className="w-4 h-4 text-[#D99B26]" />
+              <MessageCircle className="w-4 h-4" />
             </button>
 
             <button
@@ -135,26 +125,17 @@ export default function Header({ onOpenDiagnostic }: HeaderProps) {
 
           <div className="pt-4 border-t border-[#E8E8E5] flex flex-col gap-2.5">
             <button
-              id="mobile-menu-diag-cta"
+              id="mobile-menu-contact-cta"
+              type="button"
               onClick={() => {
                 setMobileMenuOpen(false);
-                onOpenDiagnostic();
+                onOpenConversation();
               }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[#1E3A47] bg-[#1E3A47]/10 rounded-lg"
-            >
-              <Sparkles className="w-4 h-4 text-[#D99B26]" />
-              <span>Fazer Diagnóstico Rápido</span>
-            </button>
-
-            <a
-              id="mobile-menu-contact-cta"
-              href="#contato"
-              onClick={(e) => handleNavClick(e, '#contato')}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] rounded-lg shadow-xs"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] rounded-xl shadow-xs cursor-pointer"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Vamos construir sua solução?</span>
-            </a>
+              <span>Vamos conversar?</span>
+            </button>
           </div>
         </div>
       )}
