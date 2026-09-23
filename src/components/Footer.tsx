@@ -119,12 +119,12 @@ export default function Footer({ onOpenConversation, onOpenAdmin }: FooterProps)
             <div className="pt-2">
               <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-[#CCCCCC]">
                 <p className="font-semibold text-white mb-1">
-                  {isEn ? "Business hours:" : "Horário de acolhimento:"}
+                  {isEn ? "Business hours:" : "Horário de atendimento:"}
                 </p>
                 <p className="text-[11px] text-[#A0A09B]">
                   {isEn
                     ? "Monday to Friday 08:30 to 18:30 (BRT) · Prompt, attentive replies."
-                    : "Segunda a Sexta das 08h30 às 18h30 · Retornos sem demora."}
+                    : "Segunda a Sexta das 08h30 às 18h30."}
                 </p>
               </div>
             </div>
