@@ -254,7 +254,7 @@ export const SOLUTIONS: SolutionItem[] = [
 export const AUDIENCE_PROFILES: AudienceProfile[] = [
   {
     id: 'comercio-local',
-    title: 'Comércio Local & Bairros',
+    title: 'Comércio',
     subtitle: 'Mercados, cafeterias, confeitarias e pequenas lojas físicas',
     iconName: 'Store',
     commonStruggle: 'Dependem do movimento da calçada ou sofrem com comissões de até 27% em marketplaces.',
@@ -360,3 +360,379 @@ export const DIAGNOSTIC_OPTIONS: DiagnosticOption[] = [
     iconName: 'Sparkles'
   }
 ];
+
+// ==========================================
+// ENGLISH DATASETS & BILINGUAL GETTERS
+// ==========================================
+
+export const PHILOSOPHY_STEPS_EN: PhilosophyStep[] = [
+  {
+    id: 'ideia',
+    number: '01',
+    title: 'The Idea',
+    tagline: 'Every business begins with an idea.',
+    quote: 'The courage to begin is born from genuine restlessness.',
+    description:
+      'It all starts when you realize you can do something better, different, or with deeper care. But ideas in your head generate anxiety when they lack a clear starting point.',
+    practicalExample: 'Example: "I want to launch an artisanal bakery brand, but I still scribble orders on napkins and miss crucial WhatsApp messages."',
+    iconName: 'Sparkles',
+    deliverables: ['Empathetic listening to your pains', 'Filtering what is essential right now', 'Clarity on tangible next steps']
+  },
+  {
+    id: 'forma',
+    number: '02',
+    title: 'The Shape',
+    tagline: 'An idea needs shape.',
+    quote: 'Without contour and structure, even the finest ideas get lost in daily friction.',
+    description:
+      'Giving shape does not mean complicating. It means mapping out how your customer discovers you, understands what you do, trusts your craft, and buys with zero friction.',
+    practicalExample: 'Example: Establishing a clear visual catalog, streamlining communications, and structuring client intake in minutes.',
+    iconName: 'LayoutGrid',
+    deliverables: ['Clean digital brand presence', 'Uncomplicated checkout experience', 'Architecture without unnecessary noise']
+  },
+  {
+    id: 'solucao',
+    number: '03',
+    title: 'The Solution',
+    tagline: 'And a sound solution transforms that shape into possibility.',
+    quote: 'Great technology works silently so you can thrive and rest.',
+    description:
+      'This is where pragmatic magic happens: agile systems, punctual automations, and web tools that operate seamlessly on your client\'s phone while giving you hours back.',
+    practicalExample: 'Example: The customer places their order smoothly, gets instant automatic confirmation on WhatsApp, and you focus on delivering quality.',
+    iconName: 'CheckCircle2',
+    deliverables: ['Tools you can master in 5 minutes', 'Authentic autonomy for the business owner', 'Scalability without operational headaches']
+  }
+];
+
+export const REAL_PROJECT_EXAMPLES_EN: RealProjectExample[] = [
+  {
+    id: 'gestao-financeira',
+    title: 'Streamlined Financial Management & Cash Flow',
+    badge: 'Real Project • Lean Finance',
+    tagline: 'Income, expense, and profit forecasting without confusing spreadsheets',
+    iconName: 'Wallet',
+    challenge:
+      'Small business owners were wasting hours trying to reconcile bank statements, scattered notebooks, and broken spreadsheets, never knowing true net profit margins at month end.',
+    solution:
+      'We engineered a clean, visual financial cockpit accessible from mobile and desktop, logging transactions in 2 taps, generating automated reports, and projecting cash flow with zero hassle.',
+    highlights: [
+      'Ultra-fast entry of income and expenses on mobile',
+      'Visual dashboard displaying real revenue, fixed costs, and net margin',
+      'Automated expense categorization without accounting jargon',
+      'Timely reminders for payables and receivables in advance',
+      'One-click export tailored for your accountant'
+    ],
+    resultsNote: 'Absolute clarity over every cent and genuine peace of mind when closing the books.'
+  },
+  {
+    id: 'calculo-preco-inteligente',
+    title: 'Smart Pricing & Real Margin Calculator',
+    badge: 'Real Project • Confident Pricing',
+    tagline: 'Accurate price setting considering fixed costs, materials, taxes, and target profit',
+    iconName: 'Calculator',
+    challenge:
+      'Many creators charged prices based on guesswork or competitor rates, discovering too late that they were losing money on each order by overlooking variable costs and labor hours.',
+    solution:
+      'We built a tailored smart calculator where the entrepreneur inputs supplies or service hours, instantly computing the ideal selling price with suggested discount tiers and break-even points.',
+    highlights: [
+      'Automatic calculation of supplies, packaging, and labor time',
+      'Real-time simulation of card processing fees, commissions, and taxes',
+      'Intelligent floor price, target average price, and ideal margin suggestions',
+      'Exportable dynamic price lists for quotes and menus',
+      'Complete elimination of the risk of working at a hidden loss'
+    ],
+    resultsNote: 'Immediate increase of up to 28% in bottom-line profitability with fair, sustainable pricing.'
+  },
+  {
+    id: 'desenvolvimento-desta-pagina',
+    title: 'Development of This Web Platform (Beeginning 4 you)',
+    badge: 'Real Project • Custom Platform',
+    tagline: 'Refined digital architecture, appointment booking, privacy compliance, and intake desk',
+    iconName: 'Globe',
+    challenge:
+      'Showcasing Beeginning 4 you\'s humanized value proposition through an ultra-fast, elegant interface with strict data privacy: no heavy forms, seamless Google Calendar integration, and a discreet admin hub.',
+    solution:
+      'Full concept and engineering of this modern React & TypeScript application, equipped with confidentiality pledges, live meeting scheduling, and an internal demand tracking system for the founder.',
+    highlights: [
+      'Minimalist aesthetic, bespoke vector typography, and authentic visual branding',
+      'Strict commercial confidentiality and full compliance with data privacy regulations',
+      'Smart booking synchronized directly with Google Calendar and Google Meet',
+      'Discreet administrative dashboard with client inquiry log and channel customization',
+      'Instant loading speed on mobile devices'
+    ],
+    resultsNote: 'A digital home that radiates credibility, warmth, and tailored technology.'
+  },
+  {
+    id: 'ecommerce-automatizado',
+    title: 'Automated & Turnkey E-Commerce Storefront',
+    badge: 'Real Project • Own Store',
+    tagline: 'Lean, secure, high-converting digital retail without bloated platform fees',
+    iconName: 'ShoppingBag',
+    challenge:
+      'Launching an agile online store with custom visual identity, integrated payment gateways and direct checkout links, dynamic shipping calculation, and automated transactional emails.',
+    solution:
+      'A streamlined, secure digital storefront ready to capture orders, process payments effortlessly, and delight buyers from their very first visit.',
+    highlights: [
+      'Distinctive visual branding with exclusive vectorized typography',
+      'Multiple payment methods (integrated gateways and direct links)',
+      'Dynamic real-time shipping calculator',
+      'Full automation for transactional emails (order, payment, dispatch)',
+      'Fast, independent platform free of abusive marketplace commissions'
+    ],
+    resultsNote: 'A smooth commercial engine running effortlessly from first tap to doorstep.'
+  },
+  {
+    id: 'sistema-gestao-agenda',
+    title: 'Interactive Web Systems & Schedule/Client Portal',
+    badge: 'Real Project • Web Application',
+    tagline: 'Intelligent routine management, separated portals, and live calendar synchronization',
+    iconName: 'Cpu',
+    challenge:
+      'Building a bespoke web tool for managing service routines, featuring dedicated portals for clients and providers, plus direct calendar synchronization.',
+    solution:
+      'An intelligent, connected digital environment that simplifies operational routines, eradicates manual checklists, and elevates the end-user experience.',
+    highlights: [
+      'Dedicated, intuitive dashboards for clients and staff',
+      'Frictionless real-time calendar and appointment sync',
+      'Centralized client database, attendance log, and history',
+      'Total removal of paper logbooks and broken parallel sheets'
+    ],
+    resultsNote: 'Uncomplicated day-to-day operations so you can focus on your craft.'
+  }
+];
+
+export const SOLUTIONS_EN: SolutionItem[] = [
+  {
+    id: 'ecommerce-completo',
+    title: 'Turnkey Automated E-Commerce Platform',
+    shortDesc: 'A lean, secure digital storefront ready to receive orders, process payments smoothly, and delight buyers from the first click.',
+    badge: 'Real Project • E-commerce',
+    iconName: 'ShoppingBag',
+    practicalPain: 'Need a fast online shop with custom visual identity, multi-gateway payments, instant shipping quotes, and transactional notifications.',
+    ourSolution: 'A streamlined, secure digital storefront built for high conversion without bloated monthly fees or complex operational weight.',
+    features: [
+      'Distinctive visual brand with custom vector typography',
+      'Integrated payment gateways and direct checkout links',
+      'Dynamic real-time shipping calculator',
+      'Automated transactional emails and order updates',
+      'Zero platform bloat or predatory per-sale commissions'
+    ],
+    estimatedDelivery: '10 to 20 business days',
+    idealFor: 'Independent makers, boutique apparel, local retailers, and creators wanting their own professional channel.'
+  },
+  {
+    id: 'sistemas-web-agenda',
+    title: 'Interactive Web Systems & Client/Booking Portals',
+    shortDesc: 'A smart, cohesive digital hub that simplifies your operational routine, eliminates manual tasks, and elevates the customer experience.',
+    badge: 'Real Project • Web System',
+    iconName: 'Cpu',
+    practicalPain: 'Struggling to coordinate appointments, client notes, and schedules across messy group chats and paper diaries.',
+    ourSolution: 'A tailored web application with dedicated views for customers and providers, with real-time schedule syncing and intake history.',
+    features: [
+      'Dedicated views for clients and service providers',
+      'Direct calendar booking without double-booking risk',
+      'Intake records, client history, and attendance tracking',
+      'Elimination of manual spreadsheets and repetitive rework',
+      'Secure access from any smartphone, tablet, or desktop'
+    ],
+    estimatedDelivery: '12 to 25 business days',
+    idealFor: 'Educators, studios, consultants, clinics, and service providers who need pristine organization.'
+  },
+  {
+    id: 'presenca-digital',
+    title: 'Bespoke Landing Pages & High-Trust Web Presence',
+    shortDesc: 'Fast, elegant, and focused web pages that convert curious visitors into genuine paying clients.',
+    badge: 'Most Popular',
+    iconName: 'Globe',
+    practicalPain: 'Clients ask for your website, but you only have a generic Instagram link that doesn\'t convey the true quality of your work.',
+    ourSolution: 'We build lightweight, mobile-first pages with instant WhatsApp booking, clean service catalogs, and authentic social proof.',
+    features: [
+      'Ultra-fast load times on mobile devices',
+      'Refined design true to your brand\'s personality',
+      'Smart WhatsApp inquiry button with pre-filled context',
+      'Search engine optimization (SEO) for local discovery'
+    ],
+    estimatedDelivery: '5 to 10 business days',
+    idealFor: 'Consultants, therapists, legal practitioners, architects, and boutique services wanting instant credibility.'
+  },
+  {
+    id: 'automacoes-whatsapp',
+    title: 'Warm & Simple WhatsApp & Routine Automations',
+    shortDesc: 'Eliminate repetitive replies, manual confirmations, and time-draining administrative chores.',
+    badge: 'Time Saver',
+    iconName: 'Zap',
+    practicalPain: 'Spending 3 hours a day copying and pasting the same price list in WhatsApp and forgetting to confirm tomorrow\'s appointments.',
+    ourSolution: 'Warm automated workflows (never sounding like a cold robot) for appointment reminders, payment prompts, and order confirmations.',
+    features: [
+      'Automatic reminders that cut no-shows by up to 70%',
+      'Customized tone of voice reflecting your personal warmth',
+      'Direct integration with Google Calendar or spreadsheets',
+      'Automated post-service follow-ups and care instructions'
+    ],
+    estimatedDelivery: '3 to 7 business days',
+    idealFor: 'Salons, therapists, independent clinics, and studios relying on punctuality and rapid quotes.'
+  },
+  {
+    id: 'paineis-descomplicados',
+    title: 'Lean, Stress-Free Business Management Dashboards',
+    shortDesc: 'Only what you need to see: daily sales, loyal customers, and top products — with zero confusing spreadsheet formulas.',
+    badge: 'Business Clarity',
+    iconName: 'BarChart3',
+    practicalPain: 'Your business numbers are split across 5 notebooks and corrupted spreadsheets, and you never know your real monthly profit.',
+    ourSolution: 'We build an intuitive, clutter-free dashboard designed exclusively around your specific operational rhythm. Zero unnecessary buttons.',
+    features: [
+      'Quick glance at cash flow, margin, and pending orders',
+      'Simple client and product registry',
+      'Accessible anywhere from your phone or laptop',
+      'One-click clean export for your tax accountant'
+    ],
+    estimatedDelivery: '7 to 15 business days',
+    idealFor: 'Shop owners, makers, and local businesses that have outgrown manual notebooks but dread bloated enterprise ERPs.'
+  },
+  {
+    id: 'integracoes-processos',
+    title: 'Tool Synchronization & Workflow Bridges',
+    shortDesc: 'Make your existing apps talk to each other: forms, emails, WhatsApp, spreadsheets, and payment processors.',
+    badge: 'Productivity',
+    iconName: 'Layers',
+    practicalPain: 'Spending half your day copying customer details from WhatsApp into sheets and typing emails by hand.',
+    ourSolution: 'We wire your touchpoints so each sale automatically records the client, notifies your phone, and issues the receipt seamlessly.',
+    features: [
+      'Secure webhooks and API connections',
+      'Instant alerts on your phone (WhatsApp or Telegram)',
+      'Automated lead and customer backups',
+      'Drastic reduction of manual human error'
+    ],
+    estimatedDelivery: '4 to 8 business days',
+    idealFor: 'Businesses already using several digital tools but losing precious time bridging them manually.'
+  }
+];
+
+export const AUDIENCE_PROFILES_EN: AudienceProfile[] = [
+  {
+    id: 'comercio-local',
+    title: 'Commerce',
+    subtitle: 'Markets, bakeries, cafes, confectioneries, and boutique retail',
+    iconName: 'Store',
+    commonStruggle: 'Overly reliant on foot traffic or losing up to 27% in delivery marketplace commissions.',
+    solutionOutcome: 'Establish an independent quick-order channel, nurture neighborhood loyalty, and retain 100% of profit.',
+    highlightTag: 'Independent Sales Channel'
+  },
+  {
+    id: 'prestadores-servico',
+    title: 'Service Providers & Solo Specialists',
+    subtitle: 'Consultants, therapists, designers, attorneys, and architects',
+    iconName: 'Briefcase',
+    commonStruggle: 'Sending scattered text messages all day and missing deals due to a lack of professional presentation.',
+    solutionOutcome: 'Gain an elegant landing page with clear offerings and frictionless booking.',
+    highlightTag: 'Instant Credibility'
+  },
+  {
+    id: 'marcas-autorais',
+    title: 'Artisan Brands & Independent Creators',
+    subtitle: 'Handmade crafts, apparel, natural cosmetics, and creative goods',
+    iconName: 'Palette',
+    commonStruggle: 'Hours lost organizing order spreadsheets instead of dedicating time to craft and quality.',
+    solutionOutcome: 'A charming digital catalog where clients order with ease, leaving you free to produce.',
+    highlightTag: 'Focus on Craft'
+  },
+  {
+    id: 'negocios-em-crescimento',
+    title: 'Transitioning Entrepreneurs',
+    subtitle: 'Businesses that started casually and now need solid operational structure',
+    iconName: 'TrendingUp',
+    commonStruggle: 'Revenue grew, but processes remain improvised since day one and are nearing operational breaking points.',
+    solutionOutcome: 'Lean workflows, clear control cockpits, and calm digital foundations that support your next leap.',
+    highlightTag: 'Structure to Scale'
+  }
+];
+
+export const USE_CASES_EN: UseCaseStory[] = [
+  {
+    id: 'case-1',
+    clientName: 'Carla Silveira',
+    businessName: 'Doce Afeto Confectionery',
+    segment: 'Artisanal Food & Bakery',
+    before: 'Wrote orders across 2 notebooks and chaotic WhatsApp threads. Experienced mixed-up deliveries and spent hours checking payment slips.',
+    after: 'Exclusive digital catalog with real photos, flavor selection, delivery date picker, and direct dispatch to the kitchen.',
+    quote: '"I used to spend my late evenings reading message by message. Now the customer configures their cake perfectly and I got my Sundays back."',
+    metric: 'Zero lost orders in 6 months'
+  },
+  {
+    id: 'case-2',
+    clientName: 'Rodrigo Mendes',
+    businessName: 'Mendes HVAC & Technical Services',
+    segment: 'Technical Services',
+    before: 'Clients called requesting quotes without basic details, and many forgot the technician visit booked the previous week.',
+    after: 'Fast professional landing page with an issue diagnosis form and automatic SMS/WhatsApp appointment reminders.',
+    quote: '"Clients now reach out already aware of the site-visit fee, and no-shows have plummeted drastically."',
+    metric: '-80% fewer missed appointments'
+  },
+  {
+    id: 'case-3',
+    clientName: 'Dr. Luísa Faria',
+    businessName: 'Espaço Integrar Wellness & Therapy',
+    segment: 'Health & Well-being',
+    before: 'Spent $120/month on clinical software of which she only used the calendar and found the interface frustratingly slow.',
+    after: 'Lightweight, secure bespoke dashboard with simple intake records and warm automated appointment reminders for patients.',
+    quote: '"Beeginning understood that I didn\'t need a tech monster, but rather peace of mind at my front desk."',
+    metric: 'Over $1,400 saved annually'
+  }
+];
+
+export const DIAGNOSTIC_OPTIONS_EN: DiagnosticOption[] = [
+  {
+    id: 'whatsapp-overload',
+    title: 'I lose hours answering repetitive messages and inquiries on WhatsApp',
+    description: 'You spend the whole day typing out pricing, payment details, and checking if inquiries were responded to.',
+    recommendedSolution: 'Warm WhatsApp Customer Service Automation & Direct Catalog',
+    iconName: 'MessageSquare'
+  },
+  {
+    id: 'no-professional-site',
+    title: 'I need a serious, professional web presence to inspire trust in potential clients',
+    description: 'When potential clients ask for your website or portfolio, you feel your current link doesn\'t do justice to your work.',
+    recommendedSolution: 'Bespoke High-Conversion Landing Page & Positioning',
+    iconName: 'Globe'
+  },
+  {
+    id: 'messy-sheets',
+    title: 'My business records are scattered across notebooks and broken spreadsheets',
+    description: 'You want to know your daily sales, which customers need follow-up, and inventory status without a headache.',
+    recommendedSolution: 'Lean, Stress-Free Management Dashboard',
+    iconName: 'Table'
+  },
+  {
+    id: 'manual-schedule',
+    title: 'Too many clients miss booked times or I waste hours scheduling by hand',
+    description: 'Your booking schedule requires dozens of manual confirmation texts every single day to avoid empty slots.',
+    recommendedSolution: 'Smart Appointment Booking System with Automated Reminders',
+    iconName: 'Calendar'
+  },
+  {
+    id: 'custom-need',
+    title: 'I have a very unique operational workflow and no off-the-shelf software fits',
+    description: 'Your business has its own rhythm and you need something engineered specifically around your way of working.',
+    recommendedSolution: 'Bespoke Digital Tool (Developed precisely for your workflow)',
+    iconName: 'Sparkles'
+  }
+];
+
+export const getPhilosophySteps = (lang: string = 'pt'): PhilosophyStep[] =>
+  lang === 'en' ? PHILOSOPHY_STEPS_EN : PHILOSOPHY_STEPS;
+
+export const getRealProjectExamples = (lang: string = 'pt'): RealProjectExample[] =>
+  lang === 'en' ? REAL_PROJECT_EXAMPLES_EN : REAL_PROJECT_EXAMPLES;
+
+export const getSolutions = (lang: string = 'pt'): SolutionItem[] =>
+  lang === 'en' ? SOLUTIONS_EN : SOLUTIONS;
+
+export const getAudienceProfiles = (lang: string = 'pt'): AudienceProfile[] =>
+  lang === 'en' ? AUDIENCE_PROFILES_EN : AUDIENCE_PROFILES;
+
+export const getUseCases = (lang: string = 'pt'): UseCaseStory[] =>
+  lang === 'en' ? USE_CASES_EN : USE_CASES;
+
+export const getDiagnosticOptions = (lang: string = 'pt'): DiagnosticOption[] =>
+  lang === 'en' ? DIAGNOSTIC_OPTIONS_EN : DIAGNOSTIC_OPTIONS;
+

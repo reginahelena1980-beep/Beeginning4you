@@ -90,7 +90,7 @@ export interface MeetingDiagnosticData {
   estimatedBudget?: string;
   meetingSummary?: string;
   nextSteps?: string;
-  opportunityStatus?: 'novo' | 'reuniao_realizada' | 'proposta_enviada' | 'negociacao' | 'fechado' | 'arquivado';
+  opportunityStatus?: 'novo' | 'reuniao_realizada' | 'proposta_elaboracao' | 'proposta_enviada' | 'negociacao' | 'fechado' | 'arquivado';
   updatedAt?: string;
 }
 
@@ -147,4 +147,5 @@ export interface ContactConfig {
   businessHours: string;
   adminPassword?: string;
   adminPasswordHash: string; // Simple password comparison
+  profilePhotoUrl?: string; // Custom profile photo for Regina
 }

@@ -30,6 +30,7 @@ import {
   getAvailableBusinessDays,
   AVAILABLE_TIME_SLOTS
 } from '../utils/calendar';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ConversationModalProps {
   isOpen: boolean;
@@ -42,6 +43,9 @@ export default function ConversationModal({
   onClose,
   initialTab = 'hub'
 }: ConversationModalProps) {
+  const { language } = useLanguage();
+  const isEn = language === 'en';
+
   const [activeTab, setActiveTab] = useState<'hub' | 'whatsapp' | 'meeting'>(initialTab);
   const [config, setConfig] = useState(getContactConfig());
 
@@ -96,7 +100,11 @@ export default function ConversationModal({
 
   const handleOpenWhatsApp = () => {
     if (!waTermAccepted) {
-      setWaError('Por favor, confirme a concordância com o termo de sigilo e LGPD antes de continuar.');
+      setWaError(
+        isEn
+          ? 'Please confirm your agreement with the confidentiality and privacy terms before continuing.'
+          : 'Por favor, confirme a concordância com o termo de sigilo e LGPD antes de continuar.'
+      );
       return;
     }
     setWaError('');
@@ -104,10 +112,10 @@ export default function ConversationModal({
     // Also register demand in Admin Storage
     saveDemandForm({
       id: `demand-wa-${Date.now()}`,
-      name: waName.trim() || 'Cliente WhatsApp',
+      name: waName.trim() || (isEn ? 'WhatsApp Visitor' : 'Cliente WhatsApp'),
       email: '',
       phone: '',
-      businessDescription: waNote.trim() || 'Contato iniciado via WhatsApp oficial',
+      businessDescription: waNote.trim() || (isEn ? 'Contact initiated via official WhatsApp' : 'Contato iniciado via WhatsApp oficial'),
       mainGoal: 'contato_direto',
       urgency: 'media',
       origin: 'whatsapp_modal',
@@ -115,14 +123,18 @@ export default function ConversationModal({
       createdAt: new Date().toISOString()
     });
 
-    let text = 'Olá! Vim pelo site da Beeginning 4 you e gostaria de conversar sobre uma ideia de negócio.';
+    let text = isEn
+      ? 'Hello! I found Beeginning 4 you through the website and would love to talk about my business idea.'
+      : 'Olá! Vim pelo site da Beeginning 4 you e gostaria de conversar sobre uma ideia de negócio.';
     if (waName.trim()) {
-      text += `\n\n👤 *Meu nome:* ${waName.trim()}`;
+      text += `\n\n👤 *${isEn ? 'My name' : 'Meu nome'}:* ${waName.trim()}`;
     }
     if (waNote.trim()) {
-      text += `\n💡 *Assunto:* ${waNote.trim()}`;
+      text += `\n💡 *${isEn ? 'Topic' : 'Assunto'}:* ${waNote.trim()}`;
     }
-    text += `\n\n🔒 *Sigilo:* Estou ciente e de acordo com o termo de sigilo e LGPD.`;
+    text += isEn
+      ? `\n\n🔒 *Confidentiality:* I am aware of and agree to the confidentiality & privacy terms.`
+      : `\n\n🔒 *Sigilo:* Estou ciente e de acordo com o termo de sigilo e LGPD.`;
 
     const encoded = encodeURIComponent(text);
     const url = `https://wa.me/${config.whatsappNumber}?text=${encoded}`;
@@ -133,15 +145,25 @@ export default function ConversationModal({
   const handleConfirmMeeting = (e: React.FormEvent) => {
     e.preventDefault();
     if (!meetingTermAccepted) {
-      setBookingError('É necessário aceitar a política de sigilo e LGPD para prosseguir com o agendamento.');
+      setBookingError(
+        isEn
+          ? 'You must accept the confidentiality and privacy policy to proceed with booking.'
+          : 'É necessário aceitar a política de sigilo e LGPD para prosseguir com o agendamento.'
+      );
       return;
     }
     if (!selectedDate || !selectedTime) {
-      setBookingError('Por favor, selecione uma data e horário disponíveis.');
+      setBookingError(
+        isEn ? 'Please choose an available date and time.' : 'Por favor, selecione uma data e horário disponíveis.'
+      );
       return;
     }
     if (!clientName.trim() || !clientEmail.trim() || !clientPhone.trim()) {
-      setBookingError('Preencha seu nome, e-mail e telefone/WhatsApp para confirmarmos seu agendamento.');
+      setBookingError(
+        isEn
+          ? 'Please fill in your name, email, and phone/WhatsApp to confirm your booking.'
+          : 'Preencha seu nome, e-mail e telefone/WhatsApp para confirmarmos seu agendamento.'
+      );
       return;
     }
 
@@ -151,18 +173,20 @@ export default function ConversationModal({
       clientName: clientName.trim(),
       clientEmail: clientEmail.trim(),
       clientPhone: clientPhone.trim(),
-      topic: meetingTopic.trim() || 'Conversa inicial sobre ideia de negócio',
+      topic: meetingTopic.trim() || (isEn ? 'Initial discussion about business idea' : 'Conversa inicial sobre ideia de negócio'),
       date: selectedDate,
       time: selectedTime,
       durationMinutes: 45,
-      meetLink: config.fixedMeetUrl || config.meetUrl || 'https://meet.google.com/beg-4you-meet',
+      meetLink: config.fixedMeetUrl || config.meetUrl || 'https://meet.google.com/fxx-ctnv-hgm',
       status: 'confirmed',
       createdAt: new Date().toISOString(),
       confidentialityAccepted: true,
       history: [
         {
           date: new Date().toISOString(),
-          action: 'Agendamento confirmado com sala Google Meet e integração com Google Calendar'
+          action: isEn
+            ? 'Appointment confirmed with Google Meet room and Google Calendar integration'
+            : 'Agendamento confirmado com sala Google Meet e integração com Google Calendar'
         }
       ]
     };
@@ -178,14 +202,23 @@ export default function ConversationModal({
     const cleanPhone = lastBookedMeeting.clientPhone.replace(/\D/g, '');
     const dateFormatted = lastBookedMeeting.date.split('-').reverse().join('/');
     const message = encodeURIComponent(
-      `Olá, ${lastBookedMeeting.clientName}!\n\n` +
-      `Aqui estão as informações da sua reunião com a *Beeginning 4 you*:\n\n` +
-      `📅 *Data:* ${dateFormatted}\n` +
-      `⏰ *Horário:* ${lastBookedMeeting.time} (Horário de Brasília)\n` +
-      `⏳ *Duração:* 45 minutos\n` +
-      `💻 *Link Google Meet:* ${lastBookedMeeting.meetLink}\n\n` +
-      `🔒 Garantimos sigilo absoluto sobre suas ideias e conformidade com a LGPD.\n` +
-      `Qualquer dúvida, estamos à disposição!`
+      isEn
+        ? `Hello, ${lastBookedMeeting.clientName}!\n\n` +
+          `Here is the information for your meeting with *Beeginning 4 you*:\n\n` +
+          `📅 *Date:* ${dateFormatted}\n` +
+          `⏰ *Time:* ${lastBookedMeeting.time} (BRT / UTC-3)\n` +
+          `⏳ *Duration:* 45 minutes\n` +
+          `💻 *Google Meet Link:* ${lastBookedMeeting.meetLink}\n\n` +
+          `🔒 Absolute confidentiality guaranteed under our privacy terms.\n` +
+          `Feel free to reach out with any questions!`
+        : `Olá, ${lastBookedMeeting.clientName}!\n\n` +
+          `Aqui estão as informações da sua reunião com a *Beeginning 4 you*:\n\n` +
+          `📅 *Data:* ${dateFormatted}\n` +
+          `⏰ *Horário:* ${lastBookedMeeting.time} (Horário de Brasília)\n` +
+          `⏳ *Duração:* 45 minutos\n` +
+          `💻 *Link Google Meet:* ${lastBookedMeeting.meetLink}\n\n` +
+          `🔒 Garantimos sigilo absoluto sobre suas ideias e conformidade com a LGPD.\n` +
+          `Qualquer dúvida, estamos à disposição!`
     );
     const targetUrl = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${message}` : `https://wa.me/?text=${message}`;
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
@@ -195,17 +228,31 @@ export default function ConversationModal({
   const handleSendToClientEmail = () => {
     if (!lastBookedMeeting) return;
     const dateFormatted = lastBookedMeeting.date.split('-').reverse().join('/');
-    const subject = encodeURIComponent(`Confirmação de Reunião - Beeginning 4 you (${dateFormatted} às ${lastBookedMeeting.time})`);
+    const subject = encodeURIComponent(
+      isEn
+        ? `Meeting Confirmation - Beeginning 4 you (${dateFormatted} at ${lastBookedMeeting.time})`
+        : `Confirmação de Reunião - Beeginning 4 you (${dateFormatted} às ${lastBookedMeeting.time})`
+    );
     const body = encodeURIComponent(
-      `Olá, ${lastBookedMeeting.clientName}!\n\n` +
-      `Confirmamos o agendamento da sua reunião com a equipe da Beeginning 4 you:\n\n` +
-      `Data: ${dateFormatted}\n` +
-      `Horário: ${lastBookedMeeting.time} (Horário de Brasília)\n` +
-      `Duração: 45 minutos\n` +
-      `Sala Virtual Google Meet: ${lastBookedMeeting.meetLink}\n\n` +
-      `Assunto: ${lastBookedMeeting.topic}\n\n` +
-      `Compromisso de Sigilo e LGPD: Todas as informações e conceitos compartilhados estão protegidos sob sigilo comercial e a Lei Geral de Proteção de Dados (Lei 13.709/2018).\n\n` +
-      `Atenciosamente,\nEquipe Beeginning 4 you`
+      isEn
+        ? `Hello, ${lastBookedMeeting.clientName}!\n\n` +
+          `We confirm your meeting with the Beeginning 4 you team:\n\n` +
+          `Date: ${dateFormatted}\n` +
+          `Time: ${lastBookedMeeting.time} (BRT / UTC-3)\n` +
+          `Duration: 45 minutes\n` +
+          `Google Meet Virtual Room: ${lastBookedMeeting.meetLink}\n\n` +
+          `Topic: ${lastBookedMeeting.topic}\n\n` +
+          `Confidentiality & Privacy: All shared ideas are strictly protected.\n\n` +
+          `Best regards,\nBeeginning 4 you Team`
+        : `Olá, ${lastBookedMeeting.clientName}!\n\n` +
+          `Confirmamos o agendamento da sua reunião com a equipe da Beeginning 4 you:\n\n` +
+          `Data: ${dateFormatted}\n` +
+          `Horário: ${lastBookedMeeting.time} (Horário de Brasília)\n` +
+          `Duração: 45 minutos\n` +
+          `Sala Virtual Google Meet: ${lastBookedMeeting.meetLink}\n\n` +
+          `Assunto: ${lastBookedMeeting.topic}\n\n` +
+          `Compromisso de Sigilo e LGPD: Todas as informações e conceitos compartilhados estão protegidos sob sigilo comercial e a Lei Geral de Proteção de Dados (Lei 13.709/2018).\n\n` +
+          `Atenciosamente,\nEquipe Beeginning 4 you`
     );
     window.open(`mailto:${lastBookedMeeting.clientEmail}?subject=${subject}&body=${body}`, '_blank');
   };
@@ -235,8 +282,8 @@ export default function ConversationModal({
                   setWaError('');
                 }}
                 className="p-1.5 -ml-1 text-[#666666] hover:text-[#1A1A1A] hover:bg-[#EBEBE8] rounded-lg transition-colors cursor-pointer"
-                title="Voltar ao menu principal"
-                aria-label="Voltar ao menu de atendimento"
+                title={isEn ? "Back to main menu" : "Voltar ao menu principal"}
+                aria-label={isEn ? "Back to menu" : "Voltar ao menu de atendimento"}
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -245,15 +292,21 @@ export default function ConversationModal({
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#E5A93B] animate-pulse" />
                 <h3 className="text-base sm:text-lg font-bold text-[#1A1A1A]">
-                  {activeTab === 'hub' && 'Vamos conversar?'}
-                  {activeTab === 'whatsapp' && 'Atendimento via WhatsApp'}
-                  {activeTab === 'meeting' && (bookingSuccess ? 'Reunião Confirmada!' : 'Agendar Reunião Google Meet')}
+                  {activeTab === 'hub' && (isEn ? "Let's talk" : 'Vamos conversar?')}
+                  {activeTab === 'whatsapp' && (isEn ? 'WhatsApp Chat' : 'Atendimento via WhatsApp')}
+                  {activeTab === 'meeting' &&
+                    (bookingSuccess
+                      ? (isEn ? 'Meeting Confirmed!' : 'Reunião Confirmada!')
+                      : (isEn ? 'Schedule a Google Meet' : 'Agendar Reunião Google Meet'))}
                 </h3>
               </div>
               <p className="text-xs text-[#666666] mt-0.5">
-                {activeTab === 'hub' && 'Transparência, acolhimento e compromisso com o seu negócio'}
-                {activeTab === 'whatsapp' && 'Conecte-se diretamente com nossa equipe'}
-                {activeTab === 'meeting' && (bookingSuccess ? 'Seu encontro virtual está reservado' : 'Reunião virtual face a face com sala fixa no Google Meet')}
+                {activeTab === 'hub' && (isEn ? 'Transparency, warm listening, and commitment to your vision' : 'Transparência, acolhimento e compromisso com o seu negócio')}
+                {activeTab === 'whatsapp' && (isEn ? 'Direct connection with our team' : 'Conecte-se diretamente com nossa equipe')}
+                {activeTab === 'meeting' &&
+                  (bookingSuccess
+                    ? (isEn ? 'Your virtual session is reserved' : 'Seu encontro virtual está reservado')
+                    : (isEn ? 'Face-to-face video call with dedicated Google Meet room' : 'Reunião virtual face a face com sala fixa no Google Meet'))}
               </p>
             </div>
           </div>
@@ -263,7 +316,7 @@ export default function ConversationModal({
             type="button"
             onClick={onClose}
             className="p-2 text-[#777777] hover:text-[#1A1A1A] hover:bg-[#EAEAE7] rounded-full transition-colors cursor-pointer"
-            aria-label="Fechar janela"
+            aria-label={isEn ? "Close window" : "Fechar janela"}
           >
             <X className="w-5 h-5" />
           </button>
@@ -288,30 +341,34 @@ export default function ConversationModal({
                       <ShieldCheck className="w-4 h-4 text-[#D99B26]" />
                     </div>
                     <h4 className="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-[#1A1A1A]">
-                      COMPROMISSO DE SIGILO E LGPD
+                      {isEn ? "CONFIDENTIALITY & PRIVACY COMMITMENT" : "COMPROMISSO DE SIGILO E LGPD"}
                     </h4>
                   </div>
                   <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#E5A93B]/20 text-[#8F6413] border border-[#E5A93B]/30 shrink-0">
-                    Segurança Garantida
+                    {isEn ? "Guaranteed Protection" : "Segurança Garantida"}
                   </span>
                 </div>
 
                 <blockquote className="text-xs sm:text-sm text-[#3A3A38] leading-relaxed border-l-3 border-[#D99B26] pl-3.5 py-1 italic font-medium bg-white/60 rounded-r-lg">
-                  &ldquo;A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018), utilizando-os exclusivamente para viabilizar o nosso contato e agendamentos.&rdquo;
+                  {isEn ? (
+                    <>&ldquo;Beeginning 4 you strictly commits to maintaining absolute confidentiality regarding all business ideas, concepts, and information shared during this first contact and any subsequent meetings, guaranteeing complete intellectual property protection to the client. In addition, we ensure full data privacy compliance, using your info solely to enable our consultation and scheduling.&rdquo;</>
+                  ) : (
+                    <>&ldquo;A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018), utilizando-os exclusivamente para viabilizar o nosso contato e agendamentos.&rdquo;</>
+                  )}
                 </blockquote>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-[#555555]">
                   <div className="flex items-center gap-1.5 font-medium">
                     <Lock className="w-3.5 h-3.5 text-[#D99B26] shrink-0" />
-                    <span>Proteção de Ideias</span>
+                    <span>{isEn ? "Idea Protection" : "Proteção de Ideias"}</span>
                   </div>
                   <div className="flex items-center gap-1.5 font-medium">
                     <ShieldCheck className="w-3.5 h-3.5 text-[#D99B26] shrink-0" />
-                    <span>Conformidade LGPD</span>
+                    <span>{isEn ? "Data Compliance" : "Conformidade LGPD"}</span>
                   </div>
                   <div className="flex items-center gap-1.5 font-medium">
                     <Clock className="w-3.5 h-3.5 text-[#D99B26] shrink-0" />
-                    <span>Sigilo Permanente</span>
+                    <span>{isEn ? "Permanent Secrecy" : "Sigilo Permanente"}</span>
                   </div>
                 </div>
               </div>
@@ -319,7 +376,7 @@ export default function ConversationModal({
               {/* 2. CANAIS DE CONTATO DISPONÍVEIS */}
               <div className="space-y-3">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#666666] block">
-                  Escolha como prefere iniciar o contato:
+                  {isEn ? "Choose how you prefer to connect:" : "Escolha como prefere iniciar o contato:"}
                 </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -335,22 +392,24 @@ export default function ConversationModal({
                           <MessageCircle className="w-6 h-6 text-[#1EBE5D]" />
                         </div>
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-[#25D366]/15 text-[#136C35]">
-                          Ágil &amp; Direto
+                          {isEn ? "Fast & Direct" : "Ágil & Direto"}
                         </span>
                       </div>
 
                       <div>
                         <h4 className="text-base font-bold text-[#1A1A1A] group-hover:text-[#136C35] transition-colors">
-                          Mande uma mensagem pelo WhatsApp
+                          {isEn ? "Send a message on WhatsApp" : "Mande uma mensagem pelo WhatsApp"}
                         </h4>
                         <p className="text-xs text-[#555555] mt-1.5 leading-relaxed">
-                          Converse em tempo real com nossa equipe. Ideal para tirar dúvidas rápidas, pedir orçamento ou trocar ideias iniciais sem burocracia.
+                          {isEn
+                            ? "Chat directly with our team in real-time. Ideal for quick questions, proposal scopes, or initial brainstorming."
+                            : "Converse em tempo real com nossa equipe. Ideal para tirar dúvidas rápidas, pedir orçamento ou trocar ideias iniciais sem burocracia."}
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-5 pt-3 border-t border-[#EAEAE7] flex items-center justify-between text-xs font-bold text-[#136C35]">
-                      <span>Iniciar conversa</span>
+                      <span>{isEn ? "Start chat" : "Iniciar conversa"}</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
@@ -367,22 +426,24 @@ export default function ConversationModal({
                           <Video className="w-6 h-6 text-[#D99B26]" />
                         </div>
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-[#E5A93B]/20 text-[#8F6413]">
-                          Face a Face
+                          {isEn ? "Face to Face" : "Face a Face"}
                         </span>
                       </div>
 
                       <div>
                         <h4 className="text-base font-bold text-[#1A1A1A] group-hover:text-[#8F6413] transition-colors">
-                          Agende uma reunião comigo
+                          {isEn ? "Schedule a meeting with me" : "Agende uma reunião comigo"}
                         </h4>
                         <p className="text-xs text-[#555555] mt-1.5 leading-relaxed">
-                          Encontro virtual de 45 minutos no Google Meet. Escolha data e horário com integração direta ao Google Calendar.
+                          {isEn
+                            ? "45-minute virtual video call on Google Meet. Select date and time with direct integration to Google Calendar."
+                            : "Encontro virtual de 45 minutos no Google Meet. Escolha data e horário com integração direta ao Google Calendar."}
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-5 pt-3 border-t border-[#EAEAE7] flex items-center justify-between text-xs font-bold text-[#8F6413]">
-                      <span>Escolher data e horário</span>
+                      <span>{isEn ? "Choose date & time" : "Escolher data e horário"}</span>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
@@ -397,9 +458,9 @@ export default function ConversationModal({
               <div className="p-4 rounded-xl bg-[#25D366]/10 border border-[#25D366]/20 flex items-start gap-3">
                 <MessageCircle className="w-5 h-5 text-[#1EBE5D] shrink-0 mt-0.5" />
                 <div className="text-xs leading-relaxed text-[#1F542E]">
-                  <p className="font-bold">Atendimento Humano no WhatsApp Oficial</p>
+                  <p className="font-bold">{isEn ? "Human Support on Official WhatsApp" : "Atendimento Humano no WhatsApp Oficial"}</p>
                   <p className="mt-0.5">
-                    Preparamos uma mensagem inicial para conectar você diretamente à nossa equipe.
+                    {isEn ? "We prepared an initial prompt to connect you directly to our team." : "Preparamos uma mensagem inicial para conectar você diretamente à nossa equipe."}
                   </p>
                 </div>
               </div>
@@ -407,12 +468,14 @@ export default function ConversationModal({
               {/* Pre-formatted message preview */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#333333]">
-                  Mensagem pré-formatada:
+                  {isEn ? "Pre-formatted message:" : "Mensagem pré-formatada:"}
                 </label>
                 <div className="p-3.5 rounded-xl bg-[#F9F9F8] border border-[#E5E5E2] text-xs font-sans text-[#333333] whitespace-pre-wrap leading-relaxed">
-                  &ldquo;Olá! Vim pelo site da Beeginning 4 you e gostaria de conversar sobre uma ideia de negócio.&rdquo;
-                  {waName && `\n\n👤 Meu nome: ${waName}`}
-                  {waNote && `\n💡 Detalhe: ${waNote}`}
+                  {isEn
+                    ? '“Hello! I found Beeginning 4 you through the website and would love to talk about my business idea.”'
+                    : '“Olá! Vim pelo site da Beeginning 4 you e gostaria de conversar sobre uma ideia de negócio.”'}
+                  {waName && `\n\n👤 ${isEn ? 'My name' : 'Meu nome'}: ${waName}`}
+                  {waNote && `\n💡 ${isEn ? 'Detail' : 'Detalhe'}: ${waNote}`}
                 </div>
               </div>
 
@@ -420,27 +483,27 @@ export default function ConversationModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label htmlFor="wa-input-name" className="block text-xs font-medium text-[#444444] mb-1">
-                    Seu nome ou marca (opcional)
+                    {isEn ? "Your name or brand (optional)" : "Seu nome ou marca (opcional)"}
                   </label>
                   <input
                     id="wa-input-name"
                     type="text"
                     value={waName}
                     onChange={(e) => setWaName(e.target.value)}
-                    placeholder="Como podemos te chamar?"
+                    placeholder={isEn ? "What should we call you?" : "Como podemos te chamar?"}
                     className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20 text-xs text-[#1A1A1A] outline-none"
                   />
                 </div>
                 <div>
                   <label htmlFor="wa-input-note" className="block text-xs font-medium text-[#444444] mb-1">
-                    Adiantar assunto (opcional)
+                    {isEn ? "Brief topic (optional)" : "Adiantar assunto (opcional)"}
                   </label>
                   <input
                     id="wa-input-note"
                     type="text"
                     value={waNote}
                     onChange={(e) => setWaNote(e.target.value)}
-                    placeholder="Ex: Gestão financeira, cálculo de preço, site..."
+                    placeholder={isEn ? "E.g.: Financial control, pricing, website..." : "Ex: Gestão financeira, cálculo de preço, site..."}
                     className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#25D366] focus:ring-2 focus:ring-[#25D366]/20 text-xs text-[#1A1A1A] outline-none"
                   />
                 </div>
@@ -460,9 +523,13 @@ export default function ConversationModal({
                     className="mt-0.5 w-4 h-4 rounded text-[#D99B26] focus:ring-[#D99B26] border-[#D5D5D0] cursor-pointer"
                   />
                   <div className="text-xs text-[#333333] leading-relaxed">
-                    <span className="font-bold text-[#1A1A1A]">Termo de Sigilo e LGPD: </span>
+                    <span className="font-bold text-[#1A1A1A]">
+                      {isEn ? "Confidentiality & Privacy Term: " : "Termo de Sigilo e LGPD: "}
+                    </span>
                     <span>
-                      A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018), utilizando-os exclusivamente para viabilizar o nosso contato e agendamentos.
+                      {isEn
+                        ? "Beeginning 4 you strictly commits to maintaining absolute confidentiality regarding all business ideas and personal details shared, guaranteeing complete intellectual property protection."
+                        : "A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018), utilizando-os exclusivamente para viabilizar o nosso contato e agendamentos."}
                     </span>
                   </div>
                 </label>
@@ -482,7 +549,7 @@ export default function ConversationModal({
                   onClick={() => setActiveTab('hub')}
                   className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[#D5D5D0] text-xs font-semibold text-[#555555] hover:text-[#1A1A1A] transition-colors cursor-pointer text-center"
                 >
-                  Voltar às opções
+                  {isEn ? "Back to options" : "Voltar às opções"}
                 </button>
 
                 <button
@@ -492,7 +559,7 @@ export default function ConversationModal({
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white text-xs font-bold shadow-sm hover:shadow-md transition-all cursor-pointer"
                 >
                   <MessageCircle className="w-4 h-4" />
-                  <span>Mandar mensagem pelo WhatsApp</span>
+                  <span>{isEn ? "Send message on WhatsApp" : "Mandar mensagem pelo WhatsApp"}</span>
                 </button>
               </div>
             </div>
@@ -509,10 +576,12 @@ export default function ConversationModal({
                       <CheckCircle2 className="w-8 h-8 text-[#D99B26]" />
                     </div>
                     <h4 className="text-xl font-display font-extrabold text-[#1A1A1A]">
-                      Reunião Agendada com Sucesso!
+                      {isEn ? "Meeting Successfully Scheduled!" : "Reunião Agendada com Sucesso!"}
                     </h4>
                     <p className="text-xs text-[#555555] max-w-md mx-auto">
-                      Seu encontro virtual face a face está confirmado. As informações foram salvas e você pode sincronizar com seu Google Calendar ou receber via WhatsApp/E-mail.
+                      {isEn
+                        ? "Your face-to-face video session is confirmed. You can sync it to your Google Calendar or receive details on WhatsApp/Email."
+                        : "Seu encontro virtual face a face está confirmado. As informações foram salvas e você pode sincronizar com seu Google Calendar ou receber via WhatsApp/E-mail."}
                     </p>
                   </div>
 
@@ -520,15 +589,21 @@ export default function ConversationModal({
                   <div className="p-5 rounded-2xl bg-[#F9F9F8] border border-[#E5E5E2] space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                       <div className="p-3 rounded-xl bg-white border border-[#EAEAE7]">
-                        <span className="text-[10px] uppercase font-bold text-[#888888] block">Data &amp; Horário</span>
-                        <span className="text-sm font-bold text-[#1A1A1A] mt-0.5 block">
-                          {lastBookedMeeting.date.split('-').reverse().join('/')} às {lastBookedMeeting.time}
+                        <span className="text-[10px] uppercase font-bold text-[#888888] block">
+                          {isEn ? "Date & Time" : "Data & Horário"}
                         </span>
-                        <span className="text-[11px] text-[#666666]">Duração: {lastBookedMeeting.durationMinutes} minutos</span>
+                        <span className="text-sm font-bold text-[#1A1A1A] mt-0.5 block">
+                          {lastBookedMeeting.date.split('-').reverse().join('/')} {isEn ? "at" : "às"} {lastBookedMeeting.time}
+                        </span>
+                        <span className="text-[11px] text-[#666666]">
+                          {isEn ? `Duration: ${lastBookedMeeting.durationMinutes} minutes` : `Duração: ${lastBookedMeeting.durationMinutes} minutos`}
+                        </span>
                       </div>
 
                       <div className="p-3 rounded-xl bg-white border border-[#EAEAE7]">
-                        <span className="text-[10px] uppercase font-bold text-[#888888] block">Participante</span>
+                        <span className="text-[10px] uppercase font-bold text-[#888888] block">
+                          {isEn ? "Participant" : "Participante"}
+                        </span>
                         <span className="text-sm font-bold text-[#1A1A1A] mt-0.5 block truncate">
                           {lastBookedMeeting.clientName}
                         </span>
@@ -541,7 +616,9 @@ export default function ConversationModal({
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                           <Video className="w-4 h-4 text-[#1E3A47]" />
-                          <span className="text-xs font-bold text-[#1E3A47]">Sala Google Meet</span>
+                          <span className="text-xs font-bold text-[#1E3A47]">
+                            {isEn ? "Google Meet Room" : "Sala Google Meet"}
+                          </span>
                         </div>
                         <p className="text-xs text-[#444444] font-mono select-all">
                           {lastBookedMeeting.meetLink}
@@ -555,14 +632,14 @@ export default function ConversationModal({
                         className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-semibold shadow-xs transition-colors shrink-0"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Acessar Sala</span>
+                        <span>{isEn ? "Join Room" : "Acessar Sala"}</span>
                       </a>
                     </div>
 
                     {/* Google Calendar & .ICS Synchronization */}
                     <div className="space-y-2 pt-1">
                       <span className="text-xs font-bold uppercase tracking-wider text-[#333333] block">
-                        1. Sincronize com seu calendário:
+                        {isEn ? "1. Sync with your calendar:" : "1. Sincronize com seu calendário:"}
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <a
@@ -573,7 +650,7 @@ export default function ConversationModal({
                           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4285F4] hover:bg-[#3367D6] text-white text-xs font-bold shadow-xs transition-colors text-center"
                         >
                           <Calendar className="w-4 h-4" />
-                          <span>Adicionar ao Google Calendar</span>
+                          <span>{isEn ? "Add to Google Calendar" : "Adicionar ao Google Calendar"}</span>
                         </a>
 
                         <button
@@ -583,7 +660,7 @@ export default function ConversationModal({
                           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#D5D5D0] hover:bg-[#F2F2EF] text-[#333333] text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                         >
                           <FileDown className="w-4 h-4 text-[#666666]" />
-                          <span>Baixar Arquivo .ICS</span>
+                          <span>{isEn ? "Download .ICS File" : "Baixar Arquivo .ICS"}</span>
                         </button>
                       </div>
                     </div>
@@ -591,7 +668,7 @@ export default function ConversationModal({
                     {/* Direct Dispatch to Client (WhatsApp / Email) */}
                     <div className="space-y-2 pt-2 border-t border-[#EAEAE7]">
                       <span className="text-xs font-bold uppercase tracking-wider text-[#333333] block">
-                        2. Receber link e informações diretamente nos seus canais:
+                        {isEn ? "2. Send link directly to your inbox/phone:" : "2. Receber link e informações diretamente nos seus canais:"}
                       </span>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <button
@@ -600,7 +677,7 @@ export default function ConversationModal({
                           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
                         >
                           <MessageCircle className="w-4 h-4" />
-                          <span>Enviar para meu WhatsApp</span>
+                          <span>{isEn ? "Send to my WhatsApp" : "Enviar para meu WhatsApp"}</span>
                         </button>
 
                         <button
@@ -609,7 +686,7 @@ export default function ConversationModal({
                           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                         >
                           <Mail className="w-4 h-4" />
-                          <span>Enviar para meu E-mail</span>
+                          <span>{isEn ? "Send to my Email" : "Enviar para meu E-mail"}</span>
                         </button>
                       </div>
                     </div>
@@ -621,7 +698,7 @@ export default function ConversationModal({
                       onClick={onClose}
                       className="px-6 py-2.5 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-xs font-bold text-[#1A1A1A] cursor-pointer"
                     >
-                      Concluir
+                      {isEn ? "Done" : "Concluir"}
                     </button>
                   </div>
                 </div>
@@ -633,18 +710,18 @@ export default function ConversationModal({
                     <div className="flex items-center gap-2 text-xs text-[#1E3A47]">
                       <Video className="w-4 h-4 shrink-0" />
                       <span>
-                        <strong>Sala Fixa Google Meet:</strong> {(config.fixedMeetUrl || config.meetUrl).replace('https://', '')}
+                        <strong>{isEn ? "Dedicated Google Meet Room:" : "Sala Fixa Google Meet:"}</strong> {(config.fixedMeetUrl || config.meetUrl).replace('https://', '')}
                       </span>
                     </div>
                     <span className="text-[11px] font-semibold text-[#8F6413] bg-[#E5A93B]/20 px-2 py-0.5 rounded">
-                      45 minutos
+                      {isEn ? "45 minutes" : "45 minutos"}
                     </span>
                   </div>
 
                   {/* Step 1: Select Date */}
                   <div className="space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#333333]">
-                      1. Escolha a data disponível:
+                      {isEn ? "1. Select available date:" : "1. Escolha a data disponível:"}
                     </label>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                       {availableDays.slice(0, 6).map((day) => {
@@ -676,7 +753,7 @@ export default function ConversationModal({
                   {/* Step 2: Select Time */}
                   <div className="space-y-2">
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#333333]">
-                      2. Escolha o horário de início (Horário de Brasília):
+                      {isEn ? "2. Select start time (Brasília Time / UTC-3):" : "2. Escolha o horário de início (Horário de Brasília):"}
                     </label>
                     <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
                       {AVAILABLE_TIME_SLOTS.map((time) => {
@@ -702,7 +779,7 @@ export default function ConversationModal({
                   {/* Step 3: Contact Details */}
                   <div className="space-y-3 pt-1">
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#333333]">
-                      3. Seus dados para o agendamento e envio do link:
+                      {isEn ? "3. Your contact information for the meeting link:" : "3. Seus dados para o agendamento e envio do link:"}
                     </label>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -714,7 +791,7 @@ export default function ConversationModal({
                             required
                             value={clientName}
                             onChange={(e) => setClientName(e.target.value)}
-                            placeholder="Seu nome completo *"
+                            placeholder={isEn ? "Your full name *" : "Seu nome completo *"}
                             className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs text-[#1A1A1A] outline-none"
                           />
                         </div>
@@ -728,7 +805,7 @@ export default function ConversationModal({
                             required
                             value={clientEmail}
                             onChange={(e) => setClientEmail(e.target.value)}
-                            placeholder="Seu e-mail *"
+                            placeholder={isEn ? "Your email *" : "Seu e-mail *"}
                             className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs text-[#1A1A1A] outline-none"
                           />
                         </div>
@@ -742,7 +819,7 @@ export default function ConversationModal({
                             required
                             value={clientPhone}
                             onChange={(e) => setClientPhone(e.target.value)}
-                            placeholder="WhatsApp / Telefone *"
+                            placeholder={isEn ? "WhatsApp / Phone *" : "WhatsApp / Telefone *"}
                             className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs text-[#1A1A1A] outline-none"
                           />
                         </div>
@@ -754,7 +831,7 @@ export default function ConversationModal({
                         type="text"
                         value={meetingTopic}
                         onChange={(e) => setMeetingTopic(e.target.value)}
-                        placeholder="Qual ideia ou desafio gostaria de discutir na reunião? (opcional)"
+                        placeholder={isEn ? "What business idea or challenge would you like to discuss? (optional)" : "Qual ideia ou desafio gostaria de discutir na reunião? (opcional)"}
                         className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs text-[#1A1A1A] outline-none"
                       />
                     </div>
@@ -774,9 +851,13 @@ export default function ConversationModal({
                         className="mt-0.5 w-4 h-4 rounded text-[#D99B26] focus:ring-[#D99B26] border-[#D5D5D0] cursor-pointer"
                       />
                       <div className="text-xs text-[#333333] leading-relaxed">
-                        <span className="font-bold text-[#1A1A1A]">Termo de Sigilo e LGPD: </span>
+                        <span className="font-bold text-[#1A1A1A]">
+                          {isEn ? "Confidentiality & Privacy Term: " : "Termo de Sigilo e LGPD: "}
+                        </span>
                         <span>
-                          A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018), utilizando-os exclusivamente para viabilizar o nosso contato e agendamentos.
+                          {isEn
+                            ? "Beeginning 4 you strictly commits to maintaining absolute confidentiality regarding all business ideas and personal details shared, guaranteeing complete intellectual property protection."
+                            : "A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018), utilizando-os exclusivamente para viabilizar o nosso contato e agendamentos."}
                         </span>
                       </div>
                     </label>
@@ -796,7 +877,7 @@ export default function ConversationModal({
                       onClick={() => setActiveTab('hub')}
                       className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-[#D5D5D0] text-xs font-semibold text-[#555555] hover:text-[#1A1A1A] transition-colors cursor-pointer text-center"
                     >
-                      Voltar às opções
+                      {isEn ? "Back to options" : "Voltar às opções"}
                     </button>
 
                     <button
@@ -805,7 +886,7 @@ export default function ConversationModal({
                       className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-[#1A1A1A] text-xs font-bold shadow-sm hover:shadow-md transition-all cursor-pointer"
                     >
                       <Calendar className="w-4 h-4" />
-                      <span>Confirmar Reunião &amp; Integrar com Google Calendar</span>
+                      <span>{isEn ? "Confirm Meeting & Add to Calendar" : "Confirmar Reunião & Integrar com Google Calendar"}</span>
                     </button>
                   </div>
                 </form>

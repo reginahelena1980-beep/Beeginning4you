@@ -1,6 +1,8 @@
 import { ArrowRight } from 'lucide-react';
 import BeeLogo from './BeeLogo';
 import workspacePhoto from '../assets/images/vivobook_rose_workspace_1789572652740.jpg';
+import { useLanguage } from '../context/LanguageContext';
+import { TRANSLATIONS } from '../data/translations';
 
 interface HeroProps {
   onOpenDiagnostic: () => void;
@@ -8,6 +10,9 @@ interface HeroProps {
 }
 
 export default function Hero({ onOpenDiagnostic }: HeroProps) {
+  const { language } = useLanguage();
+  const t = TRANSLATIONS[language];
+
   const scrollToSection = (id: string) => {
     const el = document.querySelector(id);
     if (el) {
@@ -43,7 +48,7 @@ export default function Hero({ onOpenDiagnostic }: HeroProps) {
                   onClick={() => scrollToSection('#historias')}
                   className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#181B1E] hover:bg-[#D99B26] text-white hover:text-[#181B1E] text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group"
                 >
-                  <span>Nossas Soluções</span>
+                  <span>{t.hero.solutionsBtn}</span>
                   <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                 </button>
               </div>
@@ -54,7 +59,7 @@ export default function Hero({ onOpenDiagnostic }: HeroProps) {
               {/* Authentic photographic scene */}
               <img
                 src={workspacePhoto}
-                alt="Espaço de trabalho inspirador com notebook ASUS Vivobook rosé e café na mesa de madeira"
+                alt={t.hero.altImage}
                 referrerPolicy="no-referrer"
                 className="absolute inset-0 w-full h-full object-cover object-right sm:object-center select-none"
               />
@@ -62,24 +67,24 @@ export default function Hero({ onOpenDiagnostic }: HeroProps) {
               <div className="absolute inset-0 bg-gradient-to-r from-[#F5F2EA]/92 via-[#F5F2EA]/65 to-transparent sm:from-[#F5F2EA]/85 sm:via-[#F5F2EA]/40 sm:to-transparent pointer-events-none" />
 
               {/* Overlaid Handwritten Script Slogan */}
-              <div className="relative z-10 space-y-2 max-w-sm sm:max-w-md select-none">
+              <div className="relative z-10 space-y-2 max-w-md sm:max-w-xl select-none">
                 <p className="font-baguet text-4xl sm:text-5xl lg:text-6xl text-[#181B1E] font-normal leading-[1.12]">
-                  Você traz<br />a ideia.
+                  {t.hero.sloganLine1}<br />{t.hero.sloganLine2}
                 </p>
                 <div className="inline-block relative mt-1 sm:mt-2">
-                  <p className="font-baguet text-4xl sm:text-5xl lg:text-6xl text-[#D99B26] font-normal leading-[1.12]">
-                    Nós criamos<br />a solução.
+                  <p className="font-baguet text-3xl sm:text-4.5xl lg:text-[3.25rem] text-[#D99B26] font-normal leading-[1.15]">
+                    {t.hero.sloganLine3}<br className="sm:hidden" /> {t.hero.sloganLine4}
                   </p>
-                  {/* Expressive hand-drawn yellow underline curve */}
+                  {/* Expressive hand-drawn yellow continuous underline curve */}
                   <svg
-                    className="w-48 sm:w-60 h-4 sm:h-5 text-[#D99B26] mt-1"
-                    viewBox="0 0 240 16"
+                    className="w-56 sm:w-80 lg:w-96 h-4 sm:h-5 text-[#D99B26] mt-1"
+                    viewBox="0 0 320 16"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
                     aria-hidden="true"
                   >
                     <path
-                      d="M3 10 C 65 3, 145 2, 236 11"
+                      d="M3 10 C 80 3, 200 2, 316 11"
                       stroke="currentColor"
                       strokeWidth="4"
                       strokeLinecap="round"
@@ -94,3 +99,4 @@ export default function Hero({ onOpenDiagnostic }: HeroProps) {
     </section>
   );
 }
+

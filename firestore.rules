@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Configurações públicas do site (WhatsApp oficial, link do Google Meet, foto de perfil)
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Demandas e diagnósticos enviados pelos clientes no site
+    match /demands/{demandId} {
+      allow create: if request.resource.data.name is string;
+      allow read, update, delete: if true;
+    }
+
+    // Agendamentos de reuniões Google Meet
+    match /appointments/{appointmentId} {
+      allow create: if request.resource.data.clientName is string;
+      allow read, update, delete: if true;
+    }
+
+    // Bloqueio padrão para todas as outras coleções não autorizadas
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

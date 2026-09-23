@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { DIAGNOSTIC_OPTIONS } from '../data/content';
+import { getDiagnosticOptions } from '../data/content';
+import { useLanguage } from '../context/LanguageContext';
+import { TRANSLATIONS } from '../data/translations';
 import {
   Sparkles,
   MessageSquare,
@@ -18,11 +20,15 @@ interface DiagnosticWidgetProps {
 }
 
 export default function DiagnosticWidget({ isOpen, onClose, onSelectResult }: DiagnosticWidgetProps) {
+  const { language } = useLanguage();
+  const isEn = language === 'en';
+  const t = TRANSLATIONS[language].diagnostic;
+  const options = getDiagnosticOptions(language);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const selectedOption = DIAGNOSTIC_OPTIONS.find((opt) => opt.id === selectedOptionId);
+  const selectedOption = options.find((opt) => opt.id === selectedOptionId);
 
   const getOptionIcon = (iconName: string) => {
     const props = { className: 'w-5 h-5 text-[#D99B26]' };
@@ -58,7 +64,7 @@ export default function DiagnosticWidget({ isOpen, onClose, onSelectResult }: Di
         <button
           onClick={onClose}
           className="absolute top-5 right-5 p-2 rounded-xl text-[#777777] hover:text-[#1A1A1A] hover:bg-[#F2F2EF] transition-colors"
-          aria-label="Fechar diagnóstico"
+          aria-label={isEn ? "Close diagnostic" : "Fechar diagnóstico"}
         >
           <X className="w-5 h-5" />
         </button>
@@ -67,19 +73,19 @@ export default function DiagnosticWidget({ isOpen, onClose, onSelectResult }: Di
         <div className="text-left space-y-2 mb-6">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5A93B]/20 text-[#8F6413] text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5 text-[#D99B26]" />
-            <span>Diagnóstico Rápido em 1 Minuto</span>
+            <span>{t.tag}</span>
           </div>
           <h3 className="text-2xl font-display font-extrabold text-[#1A1A1A]">
-            O que seu negócio realmente precisa hoje?
+            {t.title}
           </h3>
           <p className="text-xs sm:text-sm text-[#555555]">
-            Selecione a situação que mais se aproxima da sua dor atual para descobrirmos a ferramenta exata:
+            {t.subtitle}
           </p>
         </div>
 
         {/* Options List */}
         <div className="space-y-3 mb-6">
-          {DIAGNOSTIC_OPTIONS.map((opt) => {
+          {options.map((opt) => {
             const isSelected = opt.id === selectedOptionId;
             return (
               <button
@@ -123,13 +129,15 @@ export default function DiagnosticWidget({ isOpen, onClose, onSelectResult }: Di
         {selectedOption && (
           <div className="p-4 rounded-xl bg-[#1E3A47] text-white space-y-2 mb-6 animate-fadeIn">
             <span className="text-[11px] font-mono uppercase tracking-widest text-[#E5A93B]">
-              Recomendação Beeginning para você:
+              {t.recommendedTitle}
             </span>
             <p className="text-sm font-bold text-white">
               {selectedOption.recommendedSolution}
             </p>
             <p className="text-xs text-white/80">
-              Vamos estruturar exatamente isso no formulário para você receber uma proposta direta e realista.
+              {isEn
+                ? "We will configure this in your proposal request so you receive a realistic, direct scope."
+                : "Vamos estruturar exatamente isso no formulário para você receber uma proposta direta e realista."}
             </p>
           </div>
         )}
@@ -141,7 +149,7 @@ export default function DiagnosticWidget({ isOpen, onClose, onSelectResult }: Di
             onClick={onClose}
             className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-[#666666] hover:text-[#1A1A1A]"
           >
-            Cancelar
+            {t.cancelBtn}
           </button>
 
           <button
@@ -154,7 +162,7 @@ export default function DiagnosticWidget({ isOpen, onClose, onSelectResult }: Di
                 : 'bg-[#E0E0DB] text-[#999999] cursor-not-allowed'
             }`}
           >
-            <span>Aplicar ao meu orçamento</span>
+            <span>{isEn ? "Apply to my request" : "Aplicar ao meu orçamento"}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

@@ -20,9 +20,19 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  Filter
+  Filter,
+  Plus,
+  Send,
+  Sparkles,
+  CheckCircle2,
+  Upload,
+  Camera,
+  RotateCcw,
+  Image as ImageIcon
 } from 'lucide-react';
+import reginaDefaultPhoto from '../assets/images/regina_portrait_1790082408093.jpg';
 import { MeetingAppointment, DemandForm, ContactConfig, MeetingDiagnosticData } from '../types';
+import { uploadProfilePhotoToStorage } from '../firebase';
 import {
   getContactConfig,
   saveContactConfig,
@@ -31,10 +41,10 @@ import {
   deleteDemandForm,
   getAdminAppointments,
   saveAppointmentWithDiagnostic,
+  deleteAppointmentInStorage,
   STORAGE_CHANGE_EVENT
 } from '../utils/adminStorage';
 import { generateGoogleCalendarUrl } from '../utils/calendar';
-
 interface AdminModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,6 +57,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [loginError, setLoginError] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<'agenda' | 'demandas' | 'config'>('agenda');
+  const [showConfigPassword, setShowConfigPassword] = useState<boolean>(false);
 
   // Admin Data state
   const [config, setConfig] = useState<ContactConfig>(getContactConfig());
@@ -61,13 +72,25 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     recommendedSolution: '',
     estimatedBudget: '',
     nextSteps: '',
-    meetingSummary: ''
+    meetingSummary: '',
+    opportunityStatus: 'novo'
   });
 
   // Demand details viewer
   const [selectedDemand, setSelectedDemand] = useState<DemandForm | null>(null);
   const [demandFilter, setDemandFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isCreatingDemand, setIsCreatingDemand] = useState<boolean>(false);
+  const [newDemandForm, setNewDemandForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    businessName: '',
+    segment: '',
+    biggestNeed: '',
+    estimatedBudget: '',
+    status: 'Novo'
+  });
 
   // Config form state
   const [configForm, setConfigForm] = useState<ContactConfig>(config);
@@ -79,8 +102,18 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     const curConfig = getContactConfig();
     setConfig(curConfig);
     setConfigForm(curConfig);
-    setAppointments(getAdminAppointments());
+    const curAppointments = getAdminAppointments();
+    setAppointments(curAppointments);
     setDemands(getAllDemandForms());
+
+    // Auto-select first appointment if none is selected
+    setSelectedMeeting((prev) => {
+      if (prev) {
+        const found = curAppointments.find((a) => a.id === prev.id);
+        if (found) return found;
+      }
+      return curAppointments.length > 0 ? curAppointments[0] : null;
+    });
   };
 
   useEffect(() => {
@@ -97,16 +130,19 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   // Sync selected meeting notes form
   useEffect(() => {
     if (selectedMeeting) {
-      setMeetingNotes(
-        selectedMeeting.diagnosticNotes || {
-          businessType: '',
-          currentChallenges: selectedMeeting.topic || '',
-          recommendedSolution: '',
-          estimatedBudget: '',
-          nextSteps: '',
-          meetingSummary: ''
-        }
-      );
+      setMeetingNotes({
+        businessType: selectedMeeting.diagnosticNotes?.businessType || '',
+        currentChallenges:
+          selectedMeeting.diagnosticNotes?.currentChallenges ||
+          selectedMeeting.diagnosticNotes?.problemDescription ||
+          selectedMeeting.topic ||
+          '',
+        recommendedSolution: selectedMeeting.diagnosticNotes?.recommendedSolution || '',
+        estimatedBudget: selectedMeeting.diagnosticNotes?.estimatedBudget || '',
+        nextSteps: selectedMeeting.diagnosticNotes?.nextSteps || '',
+        meetingSummary: selectedMeeting.diagnosticNotes?.meetingSummary || '',
+        opportunityStatus: selectedMeeting.diagnosticNotes?.opportunityStatus || 'novo'
+      });
     }
   }, [selectedMeeting]);
 
@@ -119,8 +155,18 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
       setLoginError('');
       setPasswordInput('');
     } else {
-      setLoginError('Senha incorreta. Tente novamente.');
+      setLoginError('Senha incorreta. A senha padrão de fábrica é: bee2026');
     }
+  };
+
+  const handleResetToDefaultPassword = () => {
+    const cur = getContactConfig();
+    const resetConfig = { ...cur, adminPassword: 'bee2026' };
+    saveContactConfig(resetConfig);
+    setConfig(resetConfig);
+    setConfigForm(resetConfig);
+    setPasswordInput('bee2026');
+    setLoginError('');
   };
 
   const handleSaveConfig = (e: React.FormEvent) => {
@@ -131,21 +177,69 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     setTimeout(() => setConfigSavedNotice(''), 3500);
   };
 
+  const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Try uploading to Firebase Storage for cloud URL
+    try {
+      const cloudUrl = await uploadProfilePhotoToStorage(file);
+      setConfigForm((prev) => ({ ...prev, profilePhotoUrl: cloudUrl }));
+      return;
+    } catch {
+      // Fallback to local canvas compression if Firebase Storage is not initialized or fails
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          setConfigForm((prev) => ({ ...prev, profilePhotoUrl: dataUrl }));
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveMeetingNotes = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMeeting) return;
 
     const updatedMeeting: MeetingAppointment = {
       ...selectedMeeting,
-      diagnosticNotes: meetingNotes
+      diagnosticNotes: {
+        ...meetingNotes,
+        updatedAt: new Date().toISOString()
+      }
     };
 
     saveAppointmentWithDiagnostic(updatedMeeting);
     setSelectedMeeting(updatedMeeting);
     setAppointments(getAdminAppointments());
     setDemands(getAllDemandForms());
-    setNotesSavedNotice('Dados e diagnóstico da reunião salvos e vinculados com sucesso!');
-    setTimeout(() => setNotesSavedNotice(''), 3500);
+    setNotesSavedNotice('Diagnóstico e proposta gravados com sucesso! Sincronizados com a agenda e o banco de demandas.');
+    setTimeout(() => setNotesSavedNotice(''), 4500);
   };
 
   const handleUpdateMeetingStatus = (meetingId: string, status: 'confirmed' | 'rescheduled' | 'cancelled') => {
@@ -161,6 +255,65 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
       setSelectedMeeting(updated);
     }
     setAppointments(getAdminAppointments());
+  };
+
+  const handleDeleteMeeting = (meetingId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta reunião e os registros associados?')) return;
+    deleteAppointmentInStorage(meetingId);
+    const remaining = getAdminAppointments();
+    setAppointments(remaining);
+    setDemands(getAllDemandForms());
+    if (selectedMeeting?.id === meetingId) {
+      setSelectedMeeting(remaining.length > 0 ? remaining[0] : null);
+    }
+  };
+
+  const generateProposalWhatsAppUrl = () => {
+    if (!selectedMeeting) return '';
+    const phone = selectedMeeting.clientPhone.replace(/\D/g, '');
+    const greeting = `Olá, *${selectedMeeting.clientName}*! Tudo bem? Aqui é a Regina da *Beeginning 4 you*.`;
+    const meetingRecap = `Foi um prazer conversar com você sobre o seu projeto!`;
+    const challenges = meetingNotes.currentChallenges ? `\n\n📌 *Dores e Desafios Identificados:*\n${meetingNotes.currentChallenges}` : '';
+    const solution = meetingNotes.recommendedSolution ? `\n\n💡 *Solução Beeginning Proposta:*\n${meetingNotes.recommendedSolution}` : '';
+    const budget = meetingNotes.estimatedBudget ? `\n\n💰 *Estimativa de Investimento / Proposta:*\n${meetingNotes.estimatedBudget}` : '';
+    const nextSteps = meetingNotes.nextSteps ? `\n\n🗓️ *Próximos Passos & Prazos Combinados:*\n${meetingNotes.nextSteps}` : '';
+    const footer = `\n\nQualquer dúvida estou à disposição por aqui. Vamos construir juntos!`;
+
+    const fullMessage = `${greeting}\n\n${meetingRecap}${challenges}${solution}${budget}${nextSteps}${footer}`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(fullMessage)}`;
+  };
+
+  const handleCreateDemand = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDemandForm.name.trim()) return;
+    saveDemandForm({
+      name: newDemandForm.name.trim(),
+      phone: newDemandForm.phone.trim(),
+      email: newDemandForm.email.trim(),
+      contactValue: newDemandForm.phone.trim() || newDemandForm.email.trim(),
+      businessName: newDemandForm.businessName.trim(),
+      segment: newDemandForm.segment.trim(),
+      biggestNeed: newDemandForm.biggestNeed.trim(),
+      businessDescription: newDemandForm.biggestNeed.trim(),
+      source: 'manual',
+      origin: 'admin_manual',
+      status: newDemandForm.status || 'Novo',
+      adminNotes: newDemandForm.estimatedBudget
+        ? `Orçamento previsto: ${newDemandForm.estimatedBudget}`
+        : 'Demanda registrada manualmente pelo ADM'
+    });
+    setIsCreatingDemand(false);
+    setNewDemandForm({
+      name: '',
+      phone: '',
+      email: '',
+      businessName: '',
+      segment: '',
+      biggestNeed: '',
+      estimatedBudget: '',
+      status: 'Novo'
+    });
+    setDemands(getAllDemandForms());
   };
 
   const handleUpdateDemandStatus = (demandId: string, status: DemandForm['status']) => {
@@ -184,10 +337,34 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   };
 
   const filteredDemands = demands.filter((item) => {
-    const matchesFilter = demandFilter === 'all' || item.status === demandFilter;
+    const s = (item.status || '').toLowerCase();
+    const orig = (item.origin || item.source || '').toLowerCase();
+
+    let matchesFilter = true;
+    if (demandFilter === 'new') {
+      matchesFilter = s === 'novo' || s === 'new';
+    } else if (demandFilter === 'meeting') {
+      matchesFilter = orig.includes('meeting') || orig.includes('agenda') || s.includes('reunião');
+    } else if (demandFilter === 'proposal') {
+      matchesFilter =
+        s.includes('proposta') ||
+        s.includes('análise') ||
+        s.includes('analise') ||
+        s.includes('in_progress') ||
+        s.includes('atendimento');
+    } else if (demandFilter === 'completed') {
+      matchesFilter = s.includes('conclu') || s.includes('fechad');
+    }
+
     const emailStr = (item.email || item.contactValue || '').toLowerCase();
     const phoneStr = item.phone || item.contactValue || '';
-    const notesStr = (item.notes || item.biggestNeed || item.adminNotes || '').toLowerCase();
+    const notesStr = (
+      item.notes ||
+      item.biggestNeed ||
+      item.adminNotes ||
+      item.businessDescription ||
+      ''
+    ).toLowerCase();
     const matchesSearch =
       searchTerm === '' ||
       item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -273,8 +450,25 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                 </button>
               </div>
 
-              {loginError && (
-                <p className="text-xs text-red-600 font-medium">{loginError}</p>
+              {loginError ? (
+                <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-center space-y-1">
+                  <p className="text-xs text-red-600 font-semibold">{loginError}</p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <p className="text-[11px] text-[#777777]">
+                    Senha padrão inicial: <button
+                      type="button"
+                      onClick={() => {
+                        setPasswordInput('bee2026');
+                        setLoginError('');
+                      }}
+                      className="font-mono font-bold text-[#1E3A47] underline cursor-pointer hover:text-[#E5A93B]"
+                    >
+                      bee2026
+                    </button>
+                  </p>
+                </div>
               )}
 
               <button
@@ -283,6 +477,26 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
               >
                 Acessar Painel
               </button>
+
+              <div className="pt-2 flex flex-col items-center gap-1.5 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordInput('bee2026');
+                    setLoginError('');
+                  }}
+                  className="text-xs text-[#1E3A47] hover:underline font-medium cursor-pointer"
+                >
+                  Usar senha padrão (bee2026)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetToDefaultPassword}
+                  className="text-[11px] text-[#888888] hover:text-[#1A1A1A] underline cursor-pointer"
+                >
+                  Esqueci a senha / Restaurar para bee2026
+                </button>
+              </div>
             </form>
           </div>
         ) : (
@@ -342,6 +556,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
             {/* Tab Contents */}
             <div className="flex-1 overflow-y-auto p-6 bg-[#F9F9F8]">
+
               {/* TAB 1: AGENDA & REUNIÕES (WITH INTEGRATED CLIENT DIAGNOSTIC FORM) */}
               {activeTab === 'agenda' && (
                 <div className="space-y-6">
@@ -424,6 +639,22 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                                     &ldquo;{meeting.topic}&rdquo;
                                   </p>
                                 )}
+
+                                <div className="mt-2.5 pt-2 border-t border-[#F0F0EE] flex items-center justify-between gap-2">
+                                  <a
+                                    href={meeting.meetLink || config.meetUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1E3A47]/10 hover:bg-[#1E3A47]/20 text-[#1E3A47] text-[11px] font-bold transition-colors"
+                                    title="Entrar na sala do Google Meet configurada no ADM"
+                                  >
+                                    <Video className="w-3 h-3 text-[#1E3A47]" />
+                                    <span>Entrar no Meet</span>
+                                    <ExternalLink className="w-2.5 h-2.5 text-[#1E3A47]/70" />
+                                  </a>
+                                  <span className="text-[10px] text-[#888888]">45 min</span>
+                                </div>
                               </div>
                             );
                           })}
@@ -482,18 +713,20 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                           {/* Quick Actions (Meet, WhatsApp, Google Cal) */}
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                             <a
-                              href={selectedMeeting.meetLink}
+                              href={selectedMeeting.meetLink || config.meetUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center justify-center gap-1.5 p-2 rounded-lg bg-[#1E3A47]/10 hover:bg-[#1E3A47]/20 text-[#1E3A47] font-semibold"
+                              title="Abrir sala do Google Meet configurada no painel ADM"
                             >
                               <Video className="w-3.5 h-3.5" />
-                              <span>Abrir Sala Meet</span>
+                              <span>Entrar na Sala Meet</span>
+                              <ExternalLink className="w-3 h-3 text-[#1E3A47]/70" />
                             </a>
 
                             <a
                               href={`https://wa.me/${selectedMeeting.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                `Olá ${selectedMeeting.clientName}! Tudo bem? Sou da Beeginning 4 you sobre a nossa reunião agendada para ${selectedMeeting.date.split('-').reverse().join('/')} às ${selectedMeeting.time}. Link da sala: ${selectedMeeting.meetLink}`
+                                `Olá ${selectedMeeting.clientName}! Tudo bem? Sou da Beeginning 4 you sobre a nossa reunião agendada para ${selectedMeeting.date.split('-').reverse().join('/')} às ${selectedMeeting.time}. Link da sala: ${selectedMeeting.meetLink || config.meetUrl}`
                               )}`}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -516,36 +749,49 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
                           {/* Integrated Diagnostic & Meeting Form */}
                           <form onSubmit={handleSaveMeetingNotes} className="space-y-4 pt-2">
-                            <div className="flex items-center gap-2 pb-1 border-b border-[#F0EFEB]">
-                              <FileText className="w-4 h-4 text-[#E5A93B]" />
-                              <h5 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
-                                Formulário Integrado da Reunião (Diagnóstico & Demanda)
-                              </h5>
+                            <div className="flex items-center justify-between pb-1 border-b border-[#F0EFEB]">
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-[#E5A93B]" />
+                                <h5 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
+                                  Formulário Integrado da Reunião (Diagnóstico & Proposta)
+                                </h5>
+                              </div>
+                              <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Sincronizado com Demandas
+                              </span>
                             </div>
 
                             <p className="text-xs text-[#666666]">
-                              Este formulário é de acesso exclusivo seu (administrador), automaticamente vinculado com os dados cadastrados pelo cliente.
+                              Anotações gravadas aqui ficam registradas de forma segura e alimentam automaticamente o controle de propostas e demandas.
                             </p>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                               <div>
                                 <label className="block text-[11px] font-bold text-[#444444] mb-1">
-                                  Ramo / Tipo de Negócio do Cliente:
+                                  Status da Proposta / Etapa:
                                 </label>
-                                <input
-                                  type="text"
-                                  value={meetingNotes.businessType || ''}
+                                <select
+                                  value={meetingNotes.opportunityStatus || 'novo'}
                                   onChange={(e) =>
-                                    setMeetingNotes({ ...meetingNotes, businessType: e.target.value })
+                                    setMeetingNotes({
+                                      ...meetingNotes,
+                                      opportunityStatus: e.target.value as any
+                                    })
                                   }
-                                  placeholder="Ex: Consultoria, E-commerce, Escola, Saúde..."
-                                  className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
-                                />
+                                  className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] font-semibold text-xs outline-none bg-white"
+                                >
+                                  <option value="novo">1. Novo Contato / Agendado</option>
+                                  <option value="reuniao_realizada">2. Reunião Realizada</option>
+                                  <option value="proposta_elaboracao">3. Proposta em Elaboração</option>
+                                  <option value="proposta_enviada">4. Proposta Enviada ao Cliente</option>
+                                  <option value="fechado">5. Fechado / Aprovado 🎉</option>
+                                  <option value="arquivado">6. Arquivado / Recusado</option>
+                                </select>
                               </div>
 
                               <div>
                                 <label className="block text-[11px] font-bold text-[#444444] mb-1">
-                                  Faixa de Investimento / Orçamento:
+                                  Investimento / Valor Proposto:
                                 </label>
                                 <input
                                   type="text"
@@ -553,8 +799,23 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                                   onChange={(e) =>
                                     setMeetingNotes({ ...meetingNotes, estimatedBudget: e.target.value })
                                   }
-                                  placeholder="Ex: R$ 3.000 a R$ 6.000"
-                                  className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
+                                  placeholder="Ex: R$ 3.500 ou R$ 450/mês"
+                                  className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                                  Segmento / Ramo de Atuação:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={meetingNotes.businessType || ''}
+                                  onChange={(e) =>
+                                    setMeetingNotes({ ...meetingNotes, businessType: e.target.value })
+                                  }
+                                  placeholder="Ex: Consultoria, Saúde, Varejo..."
+                                  className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs"
                                 />
                               </div>
                             </div>
@@ -569,14 +830,14 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                                 onChange={(e) =>
                                   setMeetingNotes({ ...meetingNotes, currentChallenges: e.target.value })
                                 }
-                                placeholder="Gargalos operacionais, desorganização financeira, perda de clientes..."
+                                placeholder="Gargalos operacionais, retrabalho, perda de clientes, falta de processos digitais..."
                                 className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs"
                               />
                             </div>
 
                             <div className="text-xs space-y-1">
                               <label className="block text-[11px] font-bold text-[#444444]">
-                                Solução Beeginning Recomendada:
+                                Solução Beeginning Recomendada (Escopo da Proposta):
                               </label>
                               <textarea
                                 rows={2}
@@ -584,34 +845,73 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                                 onChange={(e) =>
                                   setMeetingNotes({ ...meetingNotes, recommendedSolution: e.target.value })
                                 }
-                                placeholder="Ex: Sistema web de gestão simplificada com agendamento e automação de WhatsApp..."
+                                placeholder="Ex: Plataforma web personalizada com agendamento automático, integração WhatsApp e CRM simples..."
                                 className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs"
                               />
                             </div>
 
-                            <div className="text-xs space-y-1">
-                              <label className="block text-[11px] font-bold text-[#444444]">
-                                Próximos Passos & Prazos Combinados:
-                              </label>
-                              <input
-                                type="text"
-                                value={meetingNotes.nextSteps || ''}
-                                onChange={(e) =>
-                                  setMeetingNotes({ ...meetingNotes, nextSteps: e.target.value })
-                                }
-                                placeholder="Ex: Enviar proposta comercial até sexta-feira via WhatsApp..."
-                                className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs"
-                              />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                              <div className="space-y-1">
+                                <label className="block text-[11px] font-bold text-[#444444]">
+                                  Próximos Passos & Prazos Combinados:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={meetingNotes.nextSteps || ''}
+                                  onChange={(e) =>
+                                    setMeetingNotes({ ...meetingNotes, nextSteps: e.target.value })
+                                  }
+                                  placeholder="Ex: Enviar proposta comercial até sexta-feira..."
+                                  className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="block text-[11px] font-bold text-[#444444]">
+                                  Anotações Internas Confidenciais:
+                                </label>
+                                <input
+                                  type="text"
+                                  value={meetingNotes.meetingSummary || ''}
+                                  onChange={(e) =>
+                                    setMeetingNotes({ ...meetingNotes, meetingSummary: e.target.value })
+                                  }
+                                  placeholder="Observações da equipe e lembretes de negociação..."
+                                  className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs"
+                                />
+                              </div>
                             </div>
 
-                            <div className="pt-2 flex justify-end">
+                            {/* Action Buttons Bar */}
+                            <div className="pt-3 border-t border-[#F0EFEB] flex flex-wrap items-center justify-between gap-2">
                               <button
-                                type="submit"
-                                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                                type="button"
+                                onClick={() => handleDeleteMeeting(selectedMeeting.id)}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-red-600 hover:bg-red-50 text-xs font-semibold transition-colors cursor-pointer"
                               >
-                                <Save className="w-4 h-4" />
-                                <span>Salvar Diagnóstico da Reunião</span>
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Excluir Reunião</span>
                               </button>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => window.open(generateProposalWhatsAppUrl(), '_blank')}
+                                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#136C35] text-xs font-bold transition-colors cursor-pointer"
+                                  title="Abre o WhatsApp com mensagem formatada de proposta e resumo"
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>Enviar Resumo no WhatsApp</span>
+                                </button>
+
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                                >
+                                  <Save className="w-4 h-4 text-[#E5A93B]" />
+                                  <span>Sincronizar com Demandas</span>
+                                </button>
+                              </div>
                             </div>
                           </form>
                         </div>
@@ -629,12 +929,12 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                 </div>
               )}
 
-              {/* TAB 2: BANCO DE DEMANDAS & FORMULÁRIOS RECEBIDOS */}
+              {/* TAB 2: BANCO DE DEMANDAS & CONTROLE DE PROPOSTAS */}
               {activeTab === 'demandas' && (
                 <div className="space-y-4">
-                  {/* Filters Bar */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-[#E5E5E2]">
-                    <div className="relative w-full sm:w-72">
+                  {/* Filters Bar & Quick Action */}
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-[#E5E5E2]">
+                    <div className="relative w-full md:w-64">
                       <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#888888]" />
                       <input
                         type="text"
@@ -645,29 +945,71 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                       />
                     </div>
 
-                    <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs">
-                      <span className="text-[#888888] font-bold text-[11px] shrink-0">Filtrar:</span>
-                      {(['all', 'new', 'in_progress', 'completed'] as const).map((status) => (
+                    <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto text-xs py-1">
+                      {[
+                        { id: 'all', label: `Todas (${demands.length})` },
+                        {
+                          id: 'meeting',
+                          label: `Reuniões (${
+                            demands.filter(
+                              (d) =>
+                                (d.origin || d.source || '').toLowerCase().includes('meeting') ||
+                                (d.origin || d.source || '').toLowerCase().includes('agenda') ||
+                                (d.status || '').toLowerCase().includes('reunião')
+                            ).length
+                          })`
+                        },
+                        {
+                          id: 'diagnostic',
+                          label: `Diagnósticos (${
+                            demands.filter((d) => (d.origin || d.source || '').toLowerCase().includes('diag')).length
+                          })`
+                        },
+                        {
+                          id: 'proposal',
+                          label: `Propostas (${
+                            demands.filter(
+                              (d) =>
+                                (d.status || '').toLowerCase().includes('proposta') ||
+                                (d.status || '').toLowerCase().includes('análise') ||
+                                (d.status || '').toLowerCase().includes('analise')
+                            ).length
+                          })`
+                        },
+                        {
+                          id: 'completed',
+                          label: `Concluídas (${
+                            demands.filter(
+                              (d) =>
+                                (d.status || '').toLowerCase().includes('conclu') ||
+                                (d.status || '').toLowerCase().includes('fechad')
+                            ).length
+                          })`
+                        }
+                      ].map((tabItem) => (
                         <button
-                          key={status}
+                          key={tabItem.id}
                           type="button"
-                          onClick={() => setDemandFilter(status)}
-                          className={`px-2.5 py-1 rounded-lg font-semibold shrink-0 cursor-pointer ${
-                            demandFilter === status
+                          onClick={() => setDemandFilter(tabItem.id)}
+                          className={`px-3 py-1.5 rounded-lg font-semibold shrink-0 cursor-pointer text-xs ${
+                            demandFilter === tabItem.id
                               ? 'bg-[#1E3A47] text-white'
                               : 'bg-[#F2F2EF] text-[#555555] hover:bg-[#EAEAE7]'
                           }`}
                         >
-                          {status === 'all'
-                            ? 'Todas'
-                            : status === 'new'
-                            ? 'Novas'
-                            : status === 'in_progress'
-                            ? 'Em Análise'
-                            : 'Concluídas'}
+                          {tabItem.label}
                         </button>
                       ))}
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingDemand(true)}
+                      className="w-full md:w-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#E5A93B] hover:bg-[#C98E24] text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Nova Demanda</span>
+                    </button>
                   </div>
 
                   {/* Demands List */}
@@ -680,90 +1022,226 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                      {filteredDemands.map((demand) => (
-                        <div
-                          key={demand.id}
-                          className="bg-white p-4 rounded-xl border border-[#E5E5E2] hover:border-[#1E3A47]/40 shadow-xs flex flex-col justify-between space-y-3"
-                        >
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                  demand.origin === 'diagnostic_pedir'
-                                    ? 'bg-amber-100 text-amber-900'
-                                    : demand.origin === 'meeting_booking'
-                                    ? 'bg-blue-100 text-blue-900'
-                                    : 'bg-emerald-100 text-emerald-900'
-                                }`}
+                      {filteredDemands.map((demand) => {
+                        const isFromMeeting = demand.id.startsWith('demand-from-');
+                        const meetingId = isFromMeeting ? demand.id.replace('demand-from-', '') : null;
+
+                        return (
+                          <div
+                            key={demand.id}
+                            className="bg-white p-4 rounded-xl border border-[#E5E5E2] hover:border-[#1E3A47]/40 shadow-xs flex flex-col justify-between space-y-3"
+                          >
+                            <div className="space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                    demand.origin === 'diagnostic_pedir'
+                                      ? 'bg-amber-100 text-amber-900'
+                                      : isFromMeeting || demand.origin === 'meeting_booking'
+                                      ? 'bg-blue-100 text-blue-900'
+                                      : 'bg-emerald-100 text-emerald-900'
+                                  }`}
+                                >
+                                  {demand.origin === 'diagnostic_pedir'
+                                    ? 'Diagnóstico Rápido'
+                                    : isFromMeeting || demand.origin === 'meeting_booking'
+                                    ? 'Reunião Agendada'
+                                    : 'Contato Direto'}
+                                </span>
+
+                                <span className="text-[10px] text-[#888888]">
+                                  {new Date(demand.createdAt).toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+
+                              <div>
+                                <h5 className="text-sm font-bold text-[#1A1A1A]">{demand.name}</h5>
+                                <p className="text-xs text-[#555555]">{demand.email || 'Sem e-mail'}</p>
+                                <p className="text-xs text-[#555555]">{demand.phone || demand.contactValue}</p>
+                              </div>
+
+                              {demand.businessDescription && (
+                                <p className="text-xs text-[#444444] bg-[#F7F7F5] p-2.5 rounded-lg line-clamp-3">
+                                  <strong className="text-[11px] block text-[#666666]">Desafio / Necessidade:</strong>
+                                  {demand.businessDescription}
+                                </p>
+                              )}
+
+                              {demand.adminNotes && (
+                                <p className="text-xs text-[#1E3A47] bg-[#1E3A47]/5 p-2 rounded-lg line-clamp-2">
+                                  <strong className="text-[10px] block text-[#1E3A47] uppercase font-bold">
+                                    Proposta / Anotações:
+                                  </strong>
+                                  {demand.adminNotes}
+                                </p>
+                              )}
+
+                              {/* Link to Calendar Meeting if applicable */}
+                              {isFromMeeting && meetingId && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const meet = appointments.find((a) => a.id === meetingId);
+                                    if (meet) {
+                                      setSelectedMeeting(meet);
+                                      setActiveTab('agenda');
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-[#1E3A47] hover:underline"
+                                >
+                                  <Calendar className="w-3 h-3 text-[#E5A93B]" />
+                                  <span>Abrir Reunião na Agenda &rarr;</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="pt-2 border-t border-[#EAEAE7] flex items-center justify-between gap-2">
+                              <select
+                                value={demand.status}
+                                onChange={(e) =>
+                                  handleUpdateDemandStatus(demand.id, e.target.value as DemandForm['status'])
+                                }
+                                className="text-[11px] px-2 py-1 rounded bg-[#F4F4F2] border border-[#D5D5D0] font-semibold text-[#333333] outline-none max-w-[130px] truncate"
                               >
-                                {demand.origin === 'diagnostic_pedir'
-                                  ? 'Diagnóstico Rápido'
-                                  : demand.origin === 'meeting_booking'
-                                  ? 'Reunião Agendada'
-                                  : 'Contato'}
-                              </span>
+                                <option value="Novo">Novo</option>
+                                <option value="Reunião Agendada">Reunião Agendada</option>
+                                <option value="Em Análise">Em Análise</option>
+                                <option value="Proposta em Elaboração">Proposta em Elaboração</option>
+                                <option value="Proposta Enviada">Proposta Enviada</option>
+                                <option value="Concluído">Concluído 🎉</option>
+                                <option value="Arquivado">Arquivado</option>
+                              </select>
 
-                              <span className="text-[10px] text-[#888888]">
-                                {new Date(demand.createdAt).toLocaleDateString('pt-BR')}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <a
+                                  href={`https://wa.me/${(demand.phone || demand.contactValue || '').replace(/\D/g, '')}?text=${encodeURIComponent(
+                                    `Olá ${demand.name}! Aqui é a Regina da Beeginning 4 you sobre a sua solicitação.`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 text-[#136C35] hover:bg-[#25D366]/15 rounded-lg"
+                                  title="Conversar no WhatsApp"
+                                >
+                                  <Phone className="w-3.5 h-3.5" />
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteDemand(demand.id)}
+                                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
-
-                            <div>
-                              <h5 className="text-sm font-bold text-[#1A1A1A]">{demand.name}</h5>
-                              <p className="text-xs text-[#555555]">{demand.email}</p>
-                              <p className="text-xs text-[#555555]">{demand.phone}</p>
-                            </div>
-
-                            {demand.businessDescription && (
-                              <p className="text-xs text-[#444444] bg-[#F7F7F5] p-2 rounded line-clamp-3">
-                                <strong className="text-[11px] block text-[#666666]">Desafio / Negócio:</strong>
-                                {demand.businessDescription}
-                              </p>
-                            )}
-
-                            {demand.mainGoal && (
-                              <p className="text-xs text-[#1E3A47] font-medium">
-                                Objetivo: {demand.mainGoal}
-                              </p>
-                            )}
                           </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
-                          <div className="pt-2 border-t border-[#EAEAE7] flex items-center justify-between">
-                            <select
-                              value={demand.status}
-                              onChange={(e) =>
-                                handleUpdateDemandStatus(demand.id, e.target.value as DemandForm['status'])
-                              }
-                              className="text-[11px] px-2 py-1 rounded bg-[#F4F4F2] border border-[#D5D5D0] font-semibold text-[#333333] outline-none"
-                            >
-                              <option value="new">Novo</option>
-                              <option value="in_progress">Em Atendimento</option>
-                              <option value="completed">Concluído</option>
-                              <option value="archived">Arquivado</option>
-                            </select>
-
-                            <div className="flex items-center gap-1.5">
-                              <a
-                                href={`https://wa.me/${(demand.phone || demand.contactValue || '').replace(/\D/g, '')}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 text-[#136C35] hover:bg-[#25D366]/10 rounded"
-                                title="Conversar no WhatsApp"
-                              >
-                                <Phone className="w-3.5 h-3.5" />
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteDemand(demand.id)}
-                                className="p-1.5 text-red-500 hover:bg-red-50 rounded"
-                                title="Excluir"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
+                  {/* Manual Demand Creation Modal */}
+                  {isCreatingDemand && (
+                    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+                      <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-xl space-y-4 animate-fadeIn">
+                        <div className="flex items-center justify-between pb-2 border-b border-[#EAEAE7]">
+                          <h4 className="text-sm font-bold text-[#1A1A1A]">Cadastrar Nova Demanda Manual</h4>
+                          <button
+                            type="button"
+                            onClick={() => setIsCreatingDemand(false)}
+                            className="text-[#888888] hover:text-[#1A1A1A]"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </div>
-                      ))}
+
+                        <form onSubmit={handleCreateDemand} className="space-y-3 text-xs">
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#444444] mb-1">Nome do Cliente *</label>
+                            <input
+                              required
+                              type="text"
+                              value={newDemandForm.name}
+                              onChange={(e) => setNewDemandForm({ ...newDemandForm, name: e.target.value })}
+                              placeholder="Ex: Maria Fernandes"
+                              className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#444444] mb-1">WhatsApp / Telefone</label>
+                              <input
+                                type="text"
+                                value={newDemandForm.phone}
+                                onChange={(e) => setNewDemandForm({ ...newDemandForm, phone: e.target.value })}
+                                placeholder="(11) 99999-9999"
+                                className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#444444] mb-1">E-mail</label>
+                              <input
+                                type="email"
+                                value={newDemandForm.email}
+                                onChange={(e) => setNewDemandForm({ ...newDemandForm, email: e.target.value })}
+                                placeholder="cliente@exemplo.com"
+                                className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#444444] mb-1">Empresa / Negócio</label>
+                              <input
+                                type="text"
+                                value={newDemandForm.businessName}
+                                onChange={(e) => setNewDemandForm({ ...newDemandForm, businessName: e.target.value })}
+                                placeholder="Nome da empresa"
+                                className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#444444] mb-1">Orçamento Previsto</label>
+                              <input
+                                type="text"
+                                value={newDemandForm.estimatedBudget}
+                                onChange={(e) => setNewDemandForm({ ...newDemandForm, estimatedBudget: e.target.value })}
+                                placeholder="Ex: R$ 4.000"
+                                className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#444444] mb-1">Descrição da Demanda / Projeto</label>
+                            <textarea
+                              rows={3}
+                              value={newDemandForm.biggestNeed}
+                              onChange={(e) => setNewDemandForm({ ...newDemandForm, biggestNeed: e.target.value })}
+                              placeholder="Descreva o que o cliente precisa, funcionalidades e objetivos..."
+                              className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsCreatingDemand(false)}
+                              className="px-4 py-2 rounded-xl text-xs font-semibold text-[#666666] hover:bg-[#F2F2EF]"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-[#1E3A47] hover:bg-[#162B34]"
+                            >
+                              Salvar Demanda
+                            </button>
+                          </div>
+                        </form>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -789,6 +1267,77 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                   )}
 
                   <form onSubmit={handleSaveConfig} className="space-y-4 text-xs">
+                    {/* Foto de Perfil da Regina (Seção Quem Somos / Quem está por trás) */}
+                    <div className="p-4 rounded-xl bg-[#FAF8F5] border border-[#E8E4DD] space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                        <div>
+                          <label className="block font-bold text-[#1A1A1A] text-xs">
+                            Sua Foto de Perfil (Seção "Quem está por trás")
+                          </label>
+                          <p className="text-[11px] text-[#666666]">
+                            Foto profissional e acolhedora exibida na página "Quem Somos" apresentando a Regina.
+                          </p>
+                        </div>
+                        {configForm.profilePhotoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setConfigForm({ ...configForm, profilePhotoUrl: '' })}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#888888] hover:text-red-600 transition-colors cursor-pointer self-start sm:self-auto"
+                            title="Restaurar a foto original da Regina"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Restaurar foto original</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-1">
+                        {/* Mini preview */}
+                        <div className="relative w-20 h-24 rounded-xl overflow-hidden border-2 border-white shadow-sm shrink-0 bg-[#EAEAE7]">
+                          <img
+                            src={configForm.profilePhotoUrl || reginaDefaultPhoto}
+                            alt="Pré-visualização da foto da Regina"
+                            className="w-full h-full object-cover object-center"
+                          />
+                        </div>
+
+                        <div className="flex-1 space-y-2.5 w-full">
+                          {/* File upload input button */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-bold cursor-pointer transition-colors shadow-xs">
+                              <Upload className="w-3.5 h-3.5 text-[#E5A93B]" />
+                              <span>Escolher Foto do Computador / Celular</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageFileUpload}
+                                className="hidden"
+                              />
+                            </label>
+
+                            <span className="text-[11px] text-[#777777]">JPG, PNG ou WEBP</span>
+                          </div>
+
+                          {/* Or Direct URL */}
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#666666]">
+                              Ou cole uma URL / Link direto de imagem na web:
+                            </label>
+                            <div className="relative">
+                              <ImageIcon className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#888888]" />
+                              <input
+                                type="url"
+                                value={configForm.profilePhotoUrl || ''}
+                                onChange={(e) => setConfigForm({ ...configForm, profilePhotoUrl: e.target.value })}
+                                placeholder="https://exemplo.com/sua-foto.jpg"
+                                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs bg-white text-[#1A1A1A]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block font-bold text-[#333333] mb-1">
                         Número do WhatsApp (com DDI e DDD, apenas dígitos):
@@ -848,19 +1397,35 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t border-[#EAEAE7]">
-                      <label className="block font-bold text-[#333333] mb-1">
-                        Nova Senha de Acesso ao ADM (opcional):
-                      </label>
+                    <div className="pt-4 border-t border-[#EAEAE7] space-y-2 bg-[#FBFBFA] p-4 rounded-xl border border-[#EBEBE8]">
+                      <div className="flex items-center justify-between">
+                        <label className="block font-bold text-[#1A1A1A]">
+                          Alterar Senha de Acesso ao ADM:
+                        </label>
+                        <span className="text-[11px] text-[#777777]">
+                          Padrão inicial: <code className="bg-white px-1.5 py-0.5 rounded border border-[#E0DED7] font-mono text-[#1E3A47]">bee2026</code>
+                        </span>
+                      </div>
                       <div className="relative">
                         <Lock className="w-4 h-4 absolute left-3 top-2.5 text-[#888888]" />
                         <input
-                          type="text"
+                          type={showConfigPassword ? 'text' : 'password'}
                           value={configForm.adminPassword}
                           onChange={(e) => setConfigForm({ ...configForm, adminPassword: e.target.value })}
-                          className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs font-mono"
+                          placeholder="Digite a nova senha desejada"
+                          className="w-full pl-9 pr-10 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs font-mono bg-white"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfigPassword(!showConfigPassword)}
+                          className="absolute right-3 top-2.5 text-[#888888] hover:text-[#1A1A1A] cursor-pointer"
+                        >
+                          {showConfigPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
                       </div>
+                      <p className="text-[11px] text-[#666666]">
+                        Ao salvar, esta será a nova senha necessária para entrar na área administrativa.
+                      </p>
                     </div>
 
                     <div className="pt-2 flex justify-end">
@@ -869,7 +1434,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                         className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-[#1A1A1A] text-xs font-bold transition-colors cursor-pointer shadow-sm"
                       >
                         <Save className="w-4 h-4" />
-                        <span>Salvar Todas as Configurações</span>
+                        <span>Salvar Alterações e Nova Senha</span>
                       </button>
                     </div>
                   </form>

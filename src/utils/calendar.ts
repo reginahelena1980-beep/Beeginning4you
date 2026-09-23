@@ -2,7 +2,7 @@ import { MeetingAppointment } from '../types';
 import { getContactConfig, saveAppointmentWithDiagnostic } from './adminStorage';
 
 export function getFixedGoogleMeetUrl(): string {
-  return getContactConfig().meetUrl || 'https://meet.google.com/beg-4you-meet';
+  return getContactConfig().meetUrl || 'https://meet.google.com/fxx-ctnv-hgm';
 }
 
 export function getOfficialEmail(): string {
@@ -13,7 +13,7 @@ export function getOfficialWhatsApp(): string {
   return getContactConfig().whatsappNumber || '5511999999999';
 }
 
-export const FIXED_GOOGLE_MEET_URL = 'https://meet.google.com/beg-4you-meet';
+export const FIXED_GOOGLE_MEET_URL = 'https://meet.google.com/fxx-ctnv-hgm';
 export const OFFICIAL_EMAIL = 'contato@beeginning4you.com.br';
 export const OFFICIAL_WHATSAPP = '5511999999999';
 

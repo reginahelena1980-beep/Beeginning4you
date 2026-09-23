@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { ContactFormData } from '../types';
 import { saveDemandForm, getContactConfig, STORAGE_CHANGE_EVENT } from '../utils/adminStorage';
+import { useLanguage } from '../context/LanguageContext';
+import { TRANSLATIONS } from '../data/translations';
 
 interface ContactSectionProps {
   prefilledNeed?: string;
@@ -26,6 +28,9 @@ export default function ContactSection({
   onOpenMeeting,
   isOpenDirectly = false
 }: ContactSectionProps) {
+  const { language } = useLanguage();
+  const isEn = language === 'en';
+  const t = TRANSLATIONS[language].contact;
   const [isModalOpen, setIsModalOpen] = useState(isOpenDirectly);
   const [contactConfig, setContactConfig] = useState(getContactConfig());
 
@@ -51,8 +56,8 @@ export default function ContactSection({
   useEffect(() => {
     if (prefilledNeed || prefilledSolution) {
       const combined = [
-        prefilledSolution ? `Interesse em: ${prefilledSolution}` : '',
-        prefilledNeed ? `Desafio principal: ${prefilledNeed}` : ''
+        prefilledSolution ? (isEn ? `Interest in: ${prefilledSolution}` : `Interesse em: ${prefilledSolution}`) : '',
+        prefilledNeed ? (isEn ? `Main challenge: ${prefilledNeed}` : `Desafio principal: ${prefilledNeed}`) : ''
       ]
         .filter(Boolean)
         .join('. ');
@@ -63,7 +68,7 @@ export default function ContactSection({
       }));
       setIsModalOpen(true);
     }
-  }, [prefilledNeed, prefilledSolution]);
+  }, [prefilledNeed, prefilledSolution, isEn]);
 
   useEffect(() => {
     if (isOpenDirectly) {
@@ -103,18 +108,25 @@ export default function ContactSection({
 
   const generateWhatsAppUrl = () => {
     const stageMap: Record<string, string> = {
-      ideia: 'Tenho uma ideia que quero tirar do papel',
-      rodando: 'Já tenho o negócio rodando e quero melhorar',
-      urgente: 'Preciso organizar meus processos com urgência'
+      ideia: isEn ? 'I have an idea I want to launch' : 'Tenho uma ideia que quero tirar do papel',
+      rodando: isEn ? 'My business is already running and I want to upgrade' : 'Já tenho o negócio rodando e quero melhorar',
+      urgente: isEn ? 'I need to streamline my operations urgently' : 'Preciso organizar meus processos com urgência'
     };
 
     const text = encodeURIComponent(
-      `Olá, Beeginning 4 You! Enviei o meu diagnóstico pelo formulário de contato do site.\n\n` +
-      `👤 *Meu Nome:* ${formData.name || 'Não informado'}\n` +
-      `🏢 *Negócio:* ${formData.businessName || 'Não informado'} (${formData.segment})\n` +
-      `🎯 *Momento:* ${stageMap[formData.projectStage] || formData.projectStage}\n` +
-      `💡 *O que preciso:* ${formData.biggestNeed || 'Gostaria de entender as opções sob medida'}\n\n` +
-      `Gostaria de dar o próximo passo.`
+      isEn
+        ? `Hello, Beeginning 4 You! I sent my request through the website contact form.\n\n` +
+          `👤 *My Name:* ${formData.name || 'Not specified'}\n` +
+          `🏢 *Business:* ${formData.businessName || 'Not specified'} (${formData.segment})\n` +
+          `🎯 *Stage:* ${stageMap[formData.projectStage] || formData.projectStage}\n` +
+          `💡 *Need:* ${formData.biggestNeed || 'I would like to explore bespoke options'}\n\n` +
+          `I would love to take the next step.`
+        : `Olá, Beeginning 4 You! Enviei o meu diagnóstico pelo formulário de contato do site.\n\n` +
+          `👤 *Meu Nome:* ${formData.name || 'Não informado'}\n` +
+          `🏢 *Negócio:* ${formData.businessName || 'Não informado'} (${formData.segment})\n` +
+          `🎯 *Momento:* ${stageMap[formData.projectStage] || formData.projectStage}\n` +
+          `💡 *O que preciso:* ${formData.biggestNeed || 'Gostaria de entender as opções sob medida'}\n\n` +
+          `Gostaria de dar o próximo passo.`
     );
 
     return `https://wa.me/${contactConfig.whatsappNumber}?text=${text}`;
@@ -144,15 +156,17 @@ export default function ContactSection({
           <div className="max-w-3xl mx-auto text-center space-y-4">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1E3A47]/10 text-[#1E3A47] text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-[#D99B26]" />
-              <span>Diagnóstico Sem Compromisso</span>
+              <span>{isEn ? "No-Commitment Diagnostic" : "Diagnóstico Sem Compromisso"}</span>
             </div>
 
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-extrabold text-[#1A1A1A] tracking-tight">
-              Pronto para Dar o Próximo Passo no Seu Negócio?
+              {isEn ? "Ready to Take the Next Step for Your Business?" : "Pronto para Dar o Próximo Passo no Seu Negócio?"}
             </h2>
 
             <p className="text-sm sm:text-base text-[#555555] max-w-xl mx-auto leading-relaxed">
-              Compartilhe sua ideia ou desafio atual. Analisamos sua necessidade com sigilo absoluto e retornamos com uma orientação prática, humanizada e sob medida.
+              {isEn
+                ? "Share your current idea or bottleneck. We assess your needs with strict confidentiality and provide tailored, practical guidance."
+                : "Compartilhe sua ideia ou desafio atual. Analisamos sua necessidade com sigilo absoluto e retornamos com uma orientação prática, humanizada e sob medida."}
             </p>
 
             <div className="pt-3 flex justify-center">
@@ -162,7 +176,7 @@ export default function ContactSection({
                 onClick={() => setIsModalOpen(true)}
                 className="inline-flex items-center gap-2 px-8 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 text-[#1A1A1A] text-sm sm:text-base font-bold shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
               >
-                <span>Pedir Diagnóstico Rápido</span>
+                <span>{isEn ? "Request Quick Diagnostic" : "Pedir Diagnóstico Rápido"}</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </button>
             </div>
@@ -183,7 +197,7 @@ export default function ContactSection({
               type="button"
               onClick={handleCloseModal}
               className="absolute top-4 right-4 p-2 text-[#777777] hover:text-[#1A1A1A] hover:bg-[#F2F2EF] rounded-xl transition-colors cursor-pointer"
-              aria-label="Fechar formulário de contato"
+              aria-label={isEn ? "Close contact form" : "Fechar formulário de contato"}
             >
               <X className="w-5 h-5" />
             </button>
@@ -193,18 +207,20 @@ export default function ContactSection({
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#1E3A47]/8 text-[#1E3A47] text-[11px] font-bold uppercase tracking-wider">
                   <Sparkles className="w-3 h-3 text-[#D99B26]" />
-                  <span>Diagnóstico Sob Medida</span>
+                  <span>{isEn ? "Tailored Diagnostic" : "Diagnóstico Sob Medida"}</span>
                 </span>
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#136C35] bg-[#25D366]/10 px-2.5 py-0.5 rounded-full">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#1EBE5D]" />
-                  <span>Sigilo & LGPD</span>
+                  <span>{isEn ? "Privacy & Confidentiality" : "Sigilo & LGPD"}</span>
                 </span>
               </div>
               <h3 className="text-lg sm:text-xl font-bold font-display text-[#1A1A1A]">
-                Formulário de Contato & Diagnóstico Rápido
+                {isEn ? "Contact Form & Quick Diagnostic" : "Formulário de Contato & Diagnóstico Rápido"}
               </h3>
               <p className="text-xs text-[#666666] mt-0.5">
-                Preencha os campos abaixo. Seus dados são salvos diretamente em nosso sistema com proteção integral.
+                {isEn
+                  ? "Fill out the fields below. Your details are saved securely into our private system with strict data protection."
+                  : "Preencha os campos abaixo. Seus dados são salvos diretamente em nosso sistema com proteção integral."}
               </p>
             </div>
 
@@ -215,10 +231,12 @@ export default function ContactSection({
                 </div>
                 <div className="space-y-1.5 max-w-md mx-auto">
                   <h4 className="text-lg font-bold text-[#1A1A1A]">
-                    Diagnóstico Recebido com Sucesso!
+                    {t.successTitle}
                   </h4>
                   <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
-                    Obrigado, <strong className="text-[#1A1A1A]">{formData.name}</strong>. Nossa equipe já registrou a sua demanda e entrará em contato em breve através do canal informado ({formData.contactValue}).
+                    {isEn
+                      ? `Thank you, ${formData.name}. Our team has registered your request and will reach out shortly through your contact info (${formData.contactValue}).`
+                      : `Obrigado, ${formData.name}. Nossa equipe já registrou a sua demanda e entrará em contato em breve através do canal informado (${formData.contactValue}).`}
                   </p>
                 </div>
 
@@ -230,7 +248,7 @@ export default function ContactSection({
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white text-xs font-bold shadow-sm transition-all"
                   >
                     <MessageSquare className="w-4 h-4" />
-                    <span>Falar agora no WhatsApp</span>
+                    <span>{isEn ? "Chat now on WhatsApp" : "Falar agora no WhatsApp"}</span>
                   </a>
 
                   {onOpenMeeting && (
@@ -243,7 +261,7 @@ export default function ContactSection({
                       className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-semibold transition-all cursor-pointer"
                     >
                       <Video className="w-4 h-4" />
-                      <span>Agendar no Google Meet</span>
+                      <span>{isEn ? "Schedule on Google Meet" : "Agendar no Google Meet"}</span>
                     </button>
                   )}
 
@@ -252,7 +270,7 @@ export default function ContactSection({
                     onClick={handleCloseModal}
                     className="w-full sm:w-auto px-4 py-2.5 text-xs text-[#666666] hover:text-[#1A1A1A] transition-colors cursor-pointer"
                   >
-                    Fechar
+                    {isEn ? "Close" : "Fechar"}
                   </button>
                 </div>
               </div>
@@ -265,7 +283,7 @@ export default function ContactSection({
                       htmlFor="diag-input-name"
                       className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1"
                     >
-                      Seu Nome *
+                      {isEn ? "Your Name *" : "Seu Nome *"}
                     </label>
                     <input
                       type="text"
@@ -274,7 +292,7 @@ export default function ContactSection({
                       required
                       value={formData.name}
                       onChange={handleChange}
-                      placeholder="Como você prefere ser chamado(a)?"
+                      placeholder={isEn ? "How would you like to be called?" : "Como você prefere ser chamado(a)?"}
                       className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all"
                     />
                   </div>
@@ -285,7 +303,7 @@ export default function ContactSection({
                       htmlFor="diag-input-business"
                       className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1"
                     >
-                      Nome do Negócio ou Projeto
+                      {isEn ? "Business or Project Name" : "Nome do Negócio ou Projeto"}
                     </label>
                     <input
                       type="text"
@@ -293,7 +311,7 @@ export default function ContactSection({
                       name="businessName"
                       value={formData.businessName}
                       onChange={handleChange}
-                      placeholder="Ex: Meu Negócio (ou 'Ainda no início')"
+                      placeholder={isEn ? "E.g.: My Studio (or 'Just starting')" : "Ex: Meu Negócio (ou 'Ainda no início')"}
                       className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all"
                     />
                   </div>
@@ -306,7 +324,7 @@ export default function ContactSection({
                       htmlFor="diag-input-contact"
                       className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1"
                     >
-                      WhatsApp ou E-mail para Retorno *
+                      {isEn ? "WhatsApp or Email for Follow-up *" : "WhatsApp ou E-mail para Retorno *"}
                     </label>
                     <input
                       type="text"
@@ -315,7 +333,7 @@ export default function ContactSection({
                       required
                       value={formData.contactValue}
                       onChange={handleChange}
-                      placeholder="Ex: (11) 98765-4321 ou seu@email.com"
+                      placeholder={isEn ? "E.g.: +1 555-0199 or you@email.com" : "Ex: (11) 98765-4321 ou seu@email.com"}
                       className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all"
                     />
                   </div>
@@ -326,7 +344,7 @@ export default function ContactSection({
                       htmlFor="diag-select-stage"
                       className="block text-xs font-bold uppercase tracking-wider text-[#333333] mb-1"
                     >
-                      Em Qual Momento Você Está?
+                      {isEn ? "What Stage Are You In?" : "Em Qual Momento Você Está?"}
                     </label>
                     <select
                       id="diag-select-stage"
@@ -335,9 +353,9 @@ export default function ContactSection({
                       onChange={handleChange}
                       className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all cursor-pointer"
                     >
-                      <option value="ideia">Ideia que quero tirar do papel</option>
-                      <option value="rodando">Já tenho o negócio e quero melhorar</option>
-                      <option value="urgente">Preciso organizar com urgência</option>
+                      <option value="ideia">{isEn ? "Idea I want to bring to life" : "Ideia que quero tirar do papel"}</option>
+                      <option value="rodando">{isEn ? "Running business, looking to optimize" : "Já tenho o negócio e quero melhorar"}</option>
+                      <option value="urgente">{isEn ? "Need to organize with urgency" : "Preciso organizar com urgência"}</option>
                     </select>
                   </div>
                 </div>
@@ -348,7 +366,7 @@ export default function ContactSection({
                     htmlFor="diag-textarea-need"
                     className="block text-xs font-bold uppercase tracking-wider text-[#1E3A47] mb-1"
                   >
-                    O que o seu negócio realmente precisa hoje? *
+                    {isEn ? "What does your business truly need today? *" : "O que o seu negócio realmente precisa hoje? *"}
                   </label>
                   <textarea
                     id="diag-textarea-need"
@@ -357,11 +375,17 @@ export default function ContactSection({
                     required
                     value={formData.biggestNeed}
                     onChange={handleChange}
-                    placeholder="Conte com suas palavras: qual processo está tomando seu tempo? Precisa de controle financeiro, cálculo de preço, plataforma web ou organização de agenda?"
+                    placeholder={
+                      isEn
+                        ? "In your own words: which process is taking too much time? Financial clarity, pricing calculator, custom web platform, or scheduling automation?"
+                        : "Conte com suas palavras: qual processo está tomando seu tempo? Precisa de controle financeiro, cálculo de preço, plataforma web ou organização de agenda?"
+                    }
                     className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all resize-y"
                   />
                   <p className="text-[11px] text-[#777777] mt-1">
-                    Não se preocupe com termos técnicos. Fale da sua rotina real que nós desenhamos a solução ideal.
+                    {isEn
+                      ? "Do not worry about technical jargon. Tell us about your daily reality and we will engineer the best solution."
+                      : "Não se preocupe com termos técnicos. Fale da sua rotina real que nós desenhamos a solução ideal."}
                   </p>
                 </div>
 
@@ -375,15 +399,23 @@ export default function ContactSection({
                       className="mt-0.5 w-4 h-4 rounded text-[#D99B26] focus:ring-[#D99B26] border-[#D5D5D0] cursor-pointer"
                     />
                     <span className="text-xs text-[#555555] leading-relaxed">
-                      Concordo com o <strong className="text-[#1A1A1A]">Compromisso de Sigilo e LGPD</strong> da Beeginning 4 you. Minhas informações e ideias serão tratadas com total confidencialidade e exclusivamente para este atendimento.
+                      {isEn ? (
+                        <>
+                          I agree to Beeginning 4 you's <strong className="text-[#1A1A1A]">Confidentiality & Data Privacy Commitment</strong>. My information and ideas will be handled with strict secrecy and exclusively for this consultation.
+                        </>
+                      ) : (
+                        <>
+                          Concordo com o <strong className="text-[#1A1A1A]">Compromisso de Sigilo e LGPD</strong> da Beeginning 4 you. Minhas informações e ideias serão tratadas com total confidencialidade e exclusivamente para este atendimento.
+                        </>
+                      )}
                     </span>
                   </label>
                 </div>
 
-                {/* Submit CTA - Explicitly labeled "Enviar" */}
+                {/* Submit CTA */}
                 <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                   <p className="text-[11px] text-[#666666]">
-                    🔒 Seus dados ficam protegidos em conformidade com a LGPD (Lei 13.709/2018).
+                    {t.privacyNote}
                   </p>
 
                   <button
@@ -393,10 +425,10 @@ export default function ContactSection({
                     className="inline-flex items-center justify-center gap-2 px-8 py-3 rounded-xl text-sm font-bold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 shadow-sm hover:shadow-md transition-all cursor-pointer"
                   >
                     {isSubmitting ? (
-                      <span>Enviando...</span>
+                      <span>{t.submittingBtn}</span>
                     ) : (
                       <>
-                        <span>Enviar</span>
+                        <span>{t.submitBtn}</span>
                         <Send className="w-4 h-4" />
                       </>
                     )}

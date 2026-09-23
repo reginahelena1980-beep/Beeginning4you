@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { REAL_PROJECT_EXAMPLES } from '../data/content';
+import { getRealProjectExamples } from '../data/content';
+import { useLanguage } from '../context/LanguageContext';
+import { TRANSLATIONS } from '../data/translations';
 import {
   Sparkles,
   ShoppingBag,
@@ -20,6 +22,9 @@ interface UseCasesProps {
 }
 
 export default function UseCases({ onSelectSolutionForContact }: UseCasesProps) {
+  const { language } = useLanguage();
+  const isEn = language === 'en';
+  const projects = getRealProjectExamples(language);
   const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
 
   const toggleExpand = (projectId: string) => {
@@ -65,26 +70,28 @@ export default function UseCases({ onSelectSolutionForContact }: UseCasesProps) 
         <div className="max-w-2xl mx-auto text-center space-y-3">
           <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#1E3A47]/8 text-[#1E3A47] text-[11px] font-bold uppercase tracking-wider">
             <Sparkles className="w-3 h-3 text-[#D99B26]" />
-            <span>Projetos Reais na Prática</span>
+            <span>{isEn ? "Real Projects in Practice" : "Projetos Reais na Prática"}</span>
           </div>
 
           <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-extrabold text-[#1A1A1A] tracking-tight">
-            Negócios Reais, Resultados Concretos
+            {isEn ? "Real Businesses, Concrete Results" : "Negócios Reais, Resultados Concretos"}
           </h2>
 
           <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
-            Veja como desenvolvemos a peça que faltava para a engrenagem dos nossos clientes rodar macia e sem sistemas inchados — com total sigilo e foco em eficiência.
+            {isEn
+              ? "See how we built the missing link for our clients' business machinery to run smoothly and without software bloat — with total privacy and ruthless efficiency."
+              : "Veja como desenvolvemos a peça que faltava para a engrenagem dos nossos clientes rodar macia e sem sistemas inchados — com total sigilo e foco em eficiência."}
           </p>
 
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white border border-[#E8E8E5] text-[11px] text-[#666666] shadow-2xs">
             <ShieldCheck className="w-3.5 h-3.5 text-[#D99B26] shrink-0" />
-            <span>Projetos sob medida com dados e identidades preservados</span>
+            <span>{isEn ? "Tailored projects with confidential data and brand privacy preserved" : "Projetos sob medida com dados e identidades preservados"}</span>
           </div>
         </div>
 
         {/* Delicate & Compact Real Projects Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-          {REAL_PROJECT_EXAMPLES.map((project, idx) => {
+          {projects.map((project, idx) => {
             const isExpanded = !!expandedProjects[project.id];
 
             return (
@@ -101,7 +108,7 @@ export default function UseCases({ onSelectSolutionForContact }: UseCasesProps) 
                         {renderIcon(project.iconName)}
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#1E3A47]/6 text-[#1E3A47] tracking-wider uppercase truncate max-w-[170px] sm:max-w-[190px]">
-                        {project.badge.replace('Projeto Real • ', '')}
+                        {project.badge.replace(/Projeto Real • |Real Project • /, '')}
                       </span>
                     </div>
 
@@ -125,7 +132,7 @@ export default function UseCases({ onSelectSolutionForContact }: UseCasesProps) 
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#8F6413] flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#D99B26]" />
-                        Desafio
+                        {isEn ? "Challenge" : "Desafio"}
                       </span>
                       <p className="text-[11.5px] text-[#555555] mt-0.5 leading-relaxed">
                         {project.challenge}
@@ -135,7 +142,7 @@ export default function UseCases({ onSelectSolutionForContact }: UseCasesProps) 
                     <div className="pt-2 border-t border-[#EAEAEA]">
                       <span className="text-[10px] font-bold uppercase tracking-wider text-[#1E3A47] flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A47]" />
-                        Solução Sob Medida
+                        {isEn ? "Tailored Solution" : "Solução Sob Medida"}
                       </span>
                       <p className="text-[11.5px] text-[#222222] font-medium mt-0.5 leading-relaxed">
                         {project.solution}
@@ -146,7 +153,7 @@ export default function UseCases({ onSelectSolutionForContact }: UseCasesProps) 
                   {/* Delicate Highlights */}
                   <div className="space-y-1.5 pt-0.5">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[#888888] block">
-                      O que foi entregue:
+                      {isEn ? "What was delivered:" : "O que foi entregue:"}
                     </span>
                     <ul className="space-y-1.5">
                       {(isExpanded ? project.highlights : project.highlights.slice(0, 2)).map((item, hIdx) => (
@@ -165,12 +172,12 @@ export default function UseCases({ onSelectSolutionForContact }: UseCasesProps) 
                       >
                         {isExpanded ? (
                           <>
-                            <span>Ver menos</span>
+                            <span>{isEn ? "Show less" : "Ver menos"}</span>
                             <ChevronUp className="w-3 h-3" />
                           </>
                         ) : (
                           <>
-                            <span>+ {project.highlights.length - 2} outros entregáveis</span>
+                            <span>+ {project.highlights.length - 2} {isEn ? "more deliverables" : "outros entregáveis"}</span>
                             <ChevronDown className="w-3 h-3" />
                           </>
                         )}

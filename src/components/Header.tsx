@@ -1,5 +1,8 @@
 import { useState, useEffect, type MouseEvent } from 'react';
 import { Menu, X, ArrowRight, Sparkles, MessageCircle } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { TRANSLATIONS } from '../data/translations';
+import LanguageToggle from './LanguageToggle';
 
 interface HeaderProps {
   onOpenConversation: () => void;
@@ -8,6 +11,8 @@ interface HeaderProps {
 export default function Header({ onOpenConversation }: HeaderProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { language } = useLanguage();
+  const t = TRANSLATIONS[language];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -18,12 +23,12 @@ export default function Header({ onOpenConversation }: HeaderProps) {
   }, []);
 
   const navLinks = [
-    { label: 'Início', href: '#inicio' },
-    { label: 'Quem Somos', href: '#quem-somos' },
-    { label: 'Filosofia', href: '#filosofia' },
-    { label: 'O Que Fazemos', href: '#solucoes' },
-    { label: 'Para Quem', href: '#para-quem' },
-    { label: 'Projetos Reais', href: '#historias' },
+    { label: t.nav.home, href: '#inicio' },
+    { label: t.nav.about, href: '#quem-somos' },
+    { label: t.nav.philosophy, href: '#filosofia' },
+    { label: t.nav.solutions, href: '#solucoes' },
+    { label: t.nav.audience, href: '#para-quem' },
+    { label: t.nav.projects, href: '#historias' },
   ];
 
   const handleNavClick = (e: MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -49,7 +54,7 @@ export default function Header({ onOpenConversation }: HeaderProps) {
           {/* Desktop Navigation: Aligned from the left boundary matching the hero panel below */}
           <nav
             className="hidden lg:flex items-center space-x-1 xl:space-x-1.5 pointer-events-auto -ml-2"
-            aria-label="Navegação Principal"
+            aria-label={language === 'pt' ? 'Navegação Principal' : 'Main Navigation'}
           >
             {navLinks.map((link) => (
               <a
@@ -64,27 +69,31 @@ export default function Header({ onOpenConversation }: HeaderProps) {
             ))}
           </nav>
 
-          {/* CTA Button (Desktop) - Unified Vamos conversar? / Fale Conosco */}
-          <div className="hidden sm:flex items-center gap-2 xl:gap-2.5 shrink-0 z-10 -mr-1 sm:mr-0">
+          {/* Language Toggle & CTA Button (Desktop) */}
+          <div className="hidden sm:flex items-center gap-2.5 xl:gap-3 shrink-0 z-10 -mr-1 sm:mr-0">
+            <LanguageToggle />
+
             <button
               id="header-cta-btn"
               type="button"
               onClick={onOpenConversation}
               className="inline-flex items-center gap-2 px-4 py-2 xl:px-5 xl:py-2.5 text-xs xl:text-sm font-semibold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 rounded-xl shadow-xs transition-all duration-200 whitespace-nowrap cursor-pointer"
             >
-              <span>Vamos conversar?</span>
+              <span>{t.nav.cta}</span>
               <ArrowRight className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
             </button>
           </div>
 
           {/* Mobile Menu Toggle Button */}
           <div className="flex sm:hidden items-center gap-2">
+            <LanguageToggle />
+
             <button
               id="mobile-header-conv-btn"
               onClick={onOpenConversation}
               className="p-2 text-[#1A1A1A] bg-[#E5A93B] rounded-lg shadow-xs"
-              title="Vamos conversar?"
-              aria-label="Abrir conversa"
+              title={t.nav.cta}
+              aria-label={t.nav.cta}
             >
               <MessageCircle className="w-4 h-4" />
             </button>
@@ -95,7 +104,7 @@ export default function Header({ onOpenConversation }: HeaderProps) {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2.5 rounded-lg text-[#2D2D2D] hover:bg-[#EAEAE7] focus:outline-none focus:ring-2 focus:ring-[#D99B26]"
               aria-expanded={mobileMenuOpen}
-              aria-label="Alternar menu"
+              aria-label={language === 'pt' ? 'Alternar menu' : 'Toggle menu'}
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -107,7 +116,7 @@ export default function Header({ onOpenConversation }: HeaderProps) {
       {mobileMenuOpen && (
         <div
           id="mobile-nav-panel"
-          className="lg:hidden bg-[#F9F9F8] border-b border-[#E8E8E5] px-4 pt-2 pb-6 space-y-2 shadow-lg"
+          className="lg:hidden bg-[#F9F9F8] border-b border-[#E8E8E5] px-4 pt-2 pb-6 space-y-3 shadow-lg"
         >
           <div className="space-y-1">
             {navLinks.map((link) => (
@@ -123,7 +132,14 @@ export default function Header({ onOpenConversation }: HeaderProps) {
             ))}
           </div>
 
-          <div className="pt-4 border-t border-[#E8E8E5] flex flex-col gap-2.5">
+          <div className="pt-3 border-t border-[#E8E8E5] flex flex-col gap-2.5">
+            <div className="flex items-center justify-between px-3 py-1">
+              <span className="text-xs font-medium text-[#666666]">
+                {language === 'pt' ? 'Idioma / Language:' : 'Language:'}
+              </span>
+              <LanguageToggle />
+            </div>
+
             <button
               id="mobile-menu-contact-cta"
               type="button"
@@ -134,7 +150,7 @@ export default function Header({ onOpenConversation }: HeaderProps) {
               className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] rounded-xl shadow-xs cursor-pointer"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Vamos conversar?</span>
+              <span>{t.nav.cta}</span>
             </button>
           </div>
         </div>
@@ -142,3 +158,4 @@ export default function Header({ onOpenConversation }: HeaderProps) {
     </header>
   );
 }
+
