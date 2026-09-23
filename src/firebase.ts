@@ -282,17 +282,20 @@ export function subscribeAppointmentsFromFirestore(
 // 4. Firebase Storage for Images (Profile / Brand Photo)
 // -------------------------------------------------------------
 export async function uploadProfilePhotoToStorage(file: File): Promise<string> {
-  try {
+  const uploadTask = async () => {
     const ext = file.name.split('.').pop() || 'jpg';
     const filename = `profile_photo_${Date.now()}.${ext}`;
     const storageRef = ref(storage, `profile_photos/${filename}`);
     const uploadResult = await uploadBytes(storageRef, file, {
       contentType: file.type || 'image/jpeg'
     });
-    const downloadUrl = await getDownloadURL(uploadResult.ref);
-    return downloadUrl;
-  } catch (error) {
-    console.error('[Firebase Storage] Upload error:', error);
-    throw error;
-  }
+    return await getDownloadURL(uploadResult.ref);
+  };
+
+  // Timeout after 3.5s so client never hangs if Firebase Storage bucket is unavailable
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Firebase Storage timeout')), 3500)
+  );
+
+  return Promise.race([uploadTask(), timeoutPromise]);
 }

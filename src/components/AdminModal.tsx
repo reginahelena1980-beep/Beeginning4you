@@ -28,11 +28,13 @@ import {
   Upload,
   Camera,
   RotateCcw,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import reginaDefaultPhoto from '../assets/images/regina_portrait_1790082408093.jpg';
 import { MeetingAppointment, DemandForm, ContactConfig, MeetingDiagnosticData } from '../types';
 import { uploadProfilePhotoToStorage } from '../firebase';
+import { compressImageFile, normalizeImageUrl } from '../utils/imageUtils';
 import {
   getContactConfig,
   saveContactConfig,
@@ -97,6 +99,13 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [configSavedNotice, setConfigSavedNotice] = useState<string>('');
   const [notesSavedNotice, setNotesSavedNotice] = useState<string>('');
 
+  // Photo management state
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
+  const [photoStatusNotice, setPhotoStatusNotice] = useState<string>('');
+  const [photoErrorNotice, setPhotoErrorNotice] = useState<string>('');
+  const [previewImageError, setPreviewImageError] = useState<boolean>(false);
+  const [urlInputValue, setUrlInputValue] = useState<string>('');
+
   // Load data when opening or when storage changes
   const loadData = () => {
     const curConfig = getContactConfig();
@@ -114,6 +123,9 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
       }
       return curAppointments.length > 0 ? curAppointments[0] : null;
     });
+
+    setUrlInputValue(curConfig.profilePhotoUrl || '');
+    setPreviewImageError(false);
   };
 
   useEffect(() => {
@@ -181,45 +193,93 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Try uploading to Firebase Storage for cloud URL
+    setIsUploadingPhoto(true);
+    setPhotoStatusNotice('');
+    setPhotoErrorNotice('');
+    setPreviewImageError(false);
+
     try {
-      const cloudUrl = await uploadProfilePhotoToStorage(file);
-      setConfigForm((prev) => ({ ...prev, profilePhotoUrl: cloudUrl }));
+      // 1. Instantly compress and optimize image to high-efficiency web JPEG (~40-70KB)
+      const compressedDataUrl = await compressImageFile(file, 800, 0.85);
+
+      // 2. Try Firebase Storage with fast timeout (3.5s). If available, use cloud URL; otherwise use compressed DataURL
+      let finalPhotoUrl = compressedDataUrl;
+      try {
+        const cloudUrl = await uploadProfilePhotoToStorage(file);
+        if (cloudUrl) {
+          finalPhotoUrl = cloudUrl;
+        }
+      } catch {
+        // Fallback to compressed DataURL seamlessly
+      }
+
+      // 3. Immediately persist to state, storage and dispatch to website
+      const updatedConfig: ContactConfig = {
+        ...configForm,
+        profilePhotoUrl: finalPhotoUrl
+      };
+
+      setConfigForm(updatedConfig);
+      setUrlInputValue(finalPhotoUrl.startsWith('data:') ? '' : finalPhotoUrl);
+      saveContactConfig(updatedConfig);
+      setConfig(updatedConfig);
+
+      setPhotoStatusNotice('Foto da Regina carregada e salva com sucesso no site!');
+      setTimeout(() => setPhotoStatusNotice(''), 4000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao processar a foto.';
+      setPhotoErrorNotice(msg);
+      setTimeout(() => setPhotoErrorNotice(''), 6000);
+    } finally {
+      setIsUploadingPhoto(false);
+      // Reset input value so user can re-select same file if needed
+      e.target.value = '';
+    }
+  };
+
+  const handleApplyPhotoUrl = (urlToApply?: string) => {
+    const rawUrl = urlToApply !== undefined ? urlToApply : urlInputValue;
+    setPhotoStatusNotice('');
+    setPhotoErrorNotice('');
+    setPreviewImageError(false);
+
+    if (!rawUrl.trim()) {
+      handleRestoreDefaultPhoto();
       return;
-    } catch {
-      // Fallback to local canvas compression if Firebase Storage is not initialized or fails
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 800;
-        let width = img.width;
-        let height = img.height;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-          setConfigForm((prev) => ({ ...prev, profilePhotoUrl: dataUrl }));
-        }
-      };
-      img.src = event.target?.result as string;
+    const normalized = normalizeImageUrl(rawUrl.trim());
+    const updatedConfig: ContactConfig = {
+      ...configForm,
+      profilePhotoUrl: normalized
     };
-    reader.readAsDataURL(file);
+
+    setConfigForm(updatedConfig);
+    setUrlInputValue(normalized);
+    saveContactConfig(updatedConfig);
+    setConfig(updatedConfig);
+
+    setPhotoStatusNotice('Link da foto aplicado e salvo com sucesso no site!');
+    setTimeout(() => setPhotoStatusNotice(''), 4000);
+  };
+
+  const handleRestoreDefaultPhoto = () => {
+    setPhotoStatusNotice('');
+    setPhotoErrorNotice('');
+    setPreviewImageError(false);
+
+    const updatedConfig: ContactConfig = {
+      ...configForm,
+      profilePhotoUrl: ''
+    };
+
+    setConfigForm(updatedConfig);
+    setUrlInputValue('');
+    saveContactConfig(updatedConfig);
+    setConfig(updatedConfig);
+
+    setPhotoStatusNotice('Foto original da Regina restaurada com sucesso!');
+    setTimeout(() => setPhotoStatusNotice(''), 4000);
   };
 
   const handleSaveMeetingNotes = (e: React.FormEvent) => {
@@ -1294,7 +1354,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                         {configForm.profilePhotoUrl && (
                           <button
                             type="button"
-                            onClick={() => setConfigForm({ ...configForm, profilePhotoUrl: '' })}
+                            onClick={handleRestoreDefaultPhoto}
                             className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#888888] hover:text-red-600 transition-colors cursor-pointer self-start sm:self-auto"
                             title="Restaurar a foto original da Regina"
                           >
@@ -1304,48 +1364,113 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                         )}
                       </div>
 
+                      {photoStatusNotice && (
+                        <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-medium">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>{photoStatusNotice}</span>
+                        </div>
+                      )}
+
+                      {photoErrorNotice && (
+                        <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-center gap-2 font-medium">
+                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                          <span>{photoErrorNotice}</span>
+                        </div>
+                      )}
+
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-1">
                         {/* Mini preview */}
                         <div className="relative w-20 h-24 rounded-xl overflow-hidden border-2 border-white shadow-sm shrink-0 bg-[#EAEAE7]">
                           <img
-                            src={configForm.profilePhotoUrl || reginaDefaultPhoto}
+                            src={
+                              previewImageError || !configForm.profilePhotoUrl
+                                ? reginaDefaultPhoto
+                                : configForm.profilePhotoUrl
+                            }
                             alt="Pré-visualização da foto da Regina"
+                            onError={() => setPreviewImageError(true)}
                             className="w-full h-full object-cover object-center"
                           />
+                          {isUploadingPhoto && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <Loader2 className="w-5 h-5 text-white animate-spin" />
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex-1 space-y-2.5 w-full">
                           {/* File upload input button */}
                           <div className="flex flex-wrap items-center gap-2">
-                            <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-bold cursor-pointer transition-colors shadow-xs">
-                              <Upload className="w-3.5 h-3.5 text-[#E5A93B]" />
-                              <span>Escolher Foto do Computador / Celular</span>
+                            <label
+                              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs ${
+                                isUploadingPhoto
+                                  ? 'bg-[#A0A09B] text-white cursor-not-allowed'
+                                  : 'bg-[#1E3A47] hover:bg-[#162B34] text-white cursor-pointer'
+                              }`}
+                            >
+                              {isUploadingPhoto ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E5A93B]" />
+                                  <span>Processando foto...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-3.5 h-3.5 text-[#E5A93B]" />
+                                  <span>Escolher Foto do Computador / Celular</span>
+                                </>
+                              )}
                               <input
                                 type="file"
-                                accept="image/*"
+                                accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/*"
                                 onChange={handleImageFileUpload}
+                                disabled={isUploadingPhoto}
                                 className="hidden"
                               />
                             </label>
 
-                            <span className="text-[11px] text-[#777777]">JPG, PNG ou WEBP</span>
+                            <span className="text-[11px] text-[#777777]">
+                              JPG, PNG ou WEBP (salva automaticamente)
+                            </span>
                           </div>
 
                           {/* Or Direct URL */}
                           <div className="space-y-1">
                             <label className="block text-[10px] font-bold uppercase tracking-wider text-[#666666]">
-                              Ou cole uma URL / Link direto de imagem na web:
+                              Ou cole uma URL / Link direto de imagem:
                             </label>
-                            <div className="relative">
-                              <ImageIcon className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#888888]" />
-                              <input
-                                type="url"
-                                value={configForm.profilePhotoUrl || ''}
-                                onChange={(e) => setConfigForm({ ...configForm, profilePhotoUrl: e.target.value })}
-                                placeholder="https://exemplo.com/sua-foto.jpg"
-                                className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs bg-white text-[#1A1A1A]"
-                              />
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <ImageIcon className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[#888888]" />
+                                <input
+                                  type="url"
+                                  value={urlInputValue}
+                                  onChange={(e) => {
+                                    setUrlInputValue(e.target.value);
+                                    setPreviewImageError(false);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleApplyPhotoUrl(urlInputValue);
+                                    }
+                                  }}
+                                  placeholder="https://exemplo.com/sua-foto.jpg ou link do Google Drive"
+                                  className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs bg-white text-[#1A1A1A]"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleApplyPhotoUrl(urlInputValue)}
+                                className="px-3.5 py-1.5 rounded-lg bg-[#1E3A47] hover:bg-[#162B34] text-white font-semibold text-xs cursor-pointer transition-colors shrink-0"
+                              >
+                                Aplicar
+                              </button>
                             </div>
+                            {previewImageError && (
+                              <p className="text-[11px] text-amber-700 mt-1">
+                                ⚠️ Aviso: Não foi possível carregar o link da imagem acima. Recomendamos usar o botão "Escolher Foto do Computador / Celular" para carregar a imagem diretamente.
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

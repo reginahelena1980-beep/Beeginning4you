@@ -35,11 +35,13 @@ export default function AboutUs({ onOpenConversation }: AboutUsProps) {
     const cfg = getContactConfig();
     return cfg.profilePhotoUrl || reginaPhoto;
   });
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     const handleUpdate = () => {
       const cfg = getContactConfig();
       setPhotoUrl(cfg.profilePhotoUrl || reginaPhoto);
+      setImgError(false);
     };
     window.addEventListener(STORAGE_CHANGE_EVENT, handleUpdate);
     return () => window.removeEventListener(STORAGE_CHANGE_EVENT, handleUpdate);
@@ -130,9 +132,10 @@ export default function AboutUs({ onOpenConversation }: AboutUsProps) {
             <div className="lg:col-span-5 flex flex-col items-center text-center">
               <div className="relative w-full max-w-xs sm:max-w-sm rounded-2xl overflow-hidden border-2 border-[#FAF8F5] shadow-md group">
                 <img
-                  src={photoUrl}
+                  src={imgError ? reginaPhoto : photoUrl}
                   alt={isEn ? "Regina, founder of Beeginning 4 you — Warm, authentic portrait" : "Regina, fundadora da Beeginning 4 you — Foto profissional, acolhedora e humana"}
                   referrerPolicy="no-referrer"
+                  onError={() => setImgError(true)}
                   className="w-full h-auto aspect-[3/4] object-cover object-center transition-transform duration-500 group-hover:scale-[1.02]"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#181B1E]/80 via-transparent to-transparent opacity-90" />
