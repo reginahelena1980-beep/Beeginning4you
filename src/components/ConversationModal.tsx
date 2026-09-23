@@ -137,7 +137,15 @@ export default function ConversationModal({
       : `\n\n🔒 *Sigilo:* Estou ciente e de acordo com o termo de sigilo e LGPD.`;
 
     const encoded = encodeURIComponent(text);
-    const url = `https://wa.me/${config.whatsappNumber}?text=${encoded}`;
+    const waNumber = config.whatsappNumber ? config.whatsappNumber.replace(/\D/g, '') : '';
+    if (!waNumber) {
+      window.location.href = `mailto:${config.email}?subject=${encodeURIComponent(
+        isEn ? 'Conversation with Beeginning 4 you' : 'Conversa com a Beeginning 4 you'
+      )}&body=${encoded}`;
+      onClose();
+      return;
+    }
+    const url = `https://wa.me/${waNumber}?text=${encoded}`;
     window.open(url, '_blank', 'noopener,noreferrer');
     onClose();
   };

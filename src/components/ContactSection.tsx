@@ -129,7 +129,11 @@ export default function ContactSection({
           `Gostaria de dar o próximo passo.`
     );
 
-    return `https://wa.me/${contactConfig.whatsappNumber}?text=${text}`;
+    const phone = contactConfig.whatsappNumber ? contactConfig.whatsappNumber.replace(/\D/g, '') : '';
+    if (!phone) {
+      return `mailto:${contactConfig.email}?subject=${encodeURIComponent(isEn ? 'Bespoke diagnostic submission' : 'Envio de Diagnóstico')}&body=${text}`;
+    }
+    return `https://wa.me/${phone}?text=${text}`;
   };
 
   const handleCloseModal = () => {

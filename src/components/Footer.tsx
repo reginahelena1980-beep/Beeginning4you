@@ -101,7 +101,9 @@ export default function Footer({ onOpenConversation, onOpenAdmin }: FooterProps)
                 <Phone className="w-4 h-4 text-[#E5A93B] shrink-0" />
                 <span>
                   WhatsApp:{' '}
-                  <strong className="text-white font-mono">{config.whatsappNumber}</strong>
+                  <strong className="text-white font-mono">
+                    {config.whatsappDisplay || config.whatsappNumber || (isEn ? 'Direct via button above' : 'Direto no botão acima')}
+                  </strong>
                 </span>
               </li>
               <li className="flex items-center gap-2">

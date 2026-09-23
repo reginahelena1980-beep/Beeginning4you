@@ -580,8 +580,12 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                       </div>
 
                       {appointments.length === 0 ? (
-                        <div className="p-8 text-center bg-white rounded-2xl border border-[#EAEAE7] text-xs text-[#777777]">
-                          Nenhuma reunião agendada ainda. Quando um cliente agendar pelo site, ela aparecerá aqui instantaneamente.
+                        <div className="p-8 text-center bg-white rounded-2xl border border-[#EAEAE7] text-xs text-[#777777] space-y-2">
+                          <Calendar className="w-8 h-8 text-[#CCCCCC] mx-auto" />
+                          <p className="font-semibold text-[#444444]">Nenhum agendamento encontrado</p>
+                          <p className="text-[11px] text-[#888888]">
+                            Nenhuma reunião agendada ainda. Quando um cliente agendar pelo site, ela aparecerá aqui instantaneamente.
+                          </p>
                         </div>
                       ) : (
                         <div className="space-y-2.5">
@@ -918,9 +922,15 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                       ) : (
                         <div className="p-12 text-center bg-white rounded-2xl border border-[#E5E5E2] space-y-3">
                           <User className="w-10 h-10 text-[#CCCCCC] mx-auto" />
-                          <h5 className="text-sm font-bold text-[#1A1A1A]">Selecione uma Reunião</h5>
+                          <h5 className="text-sm font-bold text-[#1A1A1A]">
+                            {appointments.length === 0
+                              ? 'Nenhum agendamento ativo'
+                              : 'Selecione uma Reunião'}
+                          </h5>
                           <p className="text-xs text-[#777777] max-w-sm mx-auto">
-                            Clique em uma reunião na lista à esquerda para abrir o formulário integrado de anotações, diagnóstico e dados do cliente.
+                            {appointments.length === 0
+                              ? 'Quando um cliente agendar pelo site, a reunião aparecerá na lista ao lado para você gerenciar diagnósticos e propostas.'
+                              : 'Clique em uma reunião na lista à esquerda para abrir o formulário integrado de anotações, diagnóstico e dados do cliente.'}
                           </p>
                         </div>
                       )}
@@ -1014,10 +1024,13 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
                   {/* Demands List */}
                   {filteredDemands.length === 0 ? (
-                    <div className="p-12 text-center bg-white rounded-2xl border border-[#E5E5E2] space-y-2">
+                    <div className="p-12 text-center bg-white rounded-2xl border border-[#E5E5E2] space-y-3">
                       <ClipboardList className="w-10 h-10 text-[#CCCCCC] mx-auto" />
-                      <p className="text-xs text-[#777777]">
-                        Nenhuma demanda encontrada com os critérios informados.
+                      <h5 className="text-sm font-bold text-[#1A1A1A]">Nenhum registro encontrado</h5>
+                      <p className="text-xs text-[#777777] max-w-md mx-auto">
+                        {demands.length === 0
+                          ? 'Nenhuma demanda ou diagnóstico recebido ainda. Novos contatos de clientes aparecerão aqui em tempo real.'
+                          : 'Nenhuma demanda encontrada com os critérios informados.'}
                       </p>
                     </div>
                   ) : (
@@ -1351,7 +1364,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                           onChange={(e) =>
                             setConfigForm({ ...configForm, whatsappNumber: e.target.value.replace(/\D/g, '') })
                           }
-                          placeholder="Ex: 5511999999999"
+                          placeholder="Ex: 5511987654321"
                           className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs font-mono"
                         />
                       </div>

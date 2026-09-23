@@ -2,17 +2,20 @@ import { ContactConfig, DemandForm, MeetingAppointment, MeetingDiagnosticData } 
 import {
   saveContactConfigToFirestore,
   subscribeContactConfigFromFirestore,
+  fetchContactConfigFromFirestore,
   saveDemandToFirestore,
   deleteDemandFromFirestore,
   subscribeDemandsFromFirestore,
+  fetchDemandsFromFirestore,
   saveAppointmentToFirestore,
   deleteAppointmentFromFirestore,
-  subscribeAppointmentsFromFirestore
+  subscribeAppointmentsFromFirestore,
+  fetchAppointmentsFromFirestore
 } from '../firebase';
 
 export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
-  whatsappNumber: '5511999999999',
-  whatsappDisplay: '(11) 99999-9999',
+  whatsappNumber: '',
+  whatsappDisplay: '',
   whatsappMessage: 'Olá! Vim pelo site da Beeginning 4 you e gostaria de conversar sobre uma ideia de negócio.',
   email: 'contato@beeginning4you.com.br',
   meetUrl: 'https://meet.google.com/fxx-ctnv-hgm',
@@ -34,8 +37,89 @@ function notifyStorageChange() {
   }
 }
 
-// Initialise Firebase real-time listeners to sync across all devices
+/**
+ * Filter out any mock/sample items that might linger in client's localStorage
+ * from previous test sessions.
+ */
+function isMockDemand(item: Partial<DemandForm>): boolean {
+  if (!item) return false;
+  const id = (item.id || '').toLowerCase();
+  const name = (item.name || '').toLowerCase();
+  return (
+    id.includes('sample') ||
+    id === 'form-sample-1' ||
+    id === 'form-sample-2' ||
+    id === 'demand-from-meet-sample-1' ||
+    name === 'mariana duarte' ||
+    name === 'carlos alberto lima'
+  );
+}
+
+function isMockMeeting(item: Partial<MeetingAppointment>): boolean {
+  if (!item) return false;
+  const id = (item.id || '').toLowerCase();
+  const name = (item.clientName || '').toLowerCase();
+  return (
+    id.includes('sample') ||
+    id === 'meet-sample-1' ||
+    name === 'carla vasconcelos'
+  );
+}
+
+function purgeLegacyMockData() {
+  if (typeof window === 'undefined') return;
+  try {
+    const formsRaw = localStorage.getItem(FORMS_STORAGE_KEY);
+    if (formsRaw) {
+      const parsed: DemandForm[] = JSON.parse(formsRaw);
+      const cleaned = parsed.filter((f) => !isMockDemand(f));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(cleaned));
+      }
+    }
+
+    const meetingsRaw = localStorage.getItem(MEETINGS_STORAGE_KEY);
+    if (meetingsRaw) {
+      const parsed: MeetingAppointment[] = JSON.parse(meetingsRaw);
+      const cleaned = parsed.filter((m) => !isMockMeeting(m));
+      if (cleaned.length !== parsed.length) {
+        localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(cleaned));
+      }
+    }
+  } catch (err) {
+    console.warn('Could not purge legacy mock data', err);
+  }
+}
+
+// Initialise Firebase real-time listeners and direct initial fetch
 if (typeof window !== 'undefined') {
+  purgeLegacyMockData();
+
+  // 1. One-off initial direct fetch to prime cache from live Firestore
+  fetchContactConfigFromFirestore().then((remoteConfig) => {
+    if (remoteConfig && Object.keys(remoteConfig).length > 0) {
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(remoteConfig));
+      notifyStorageChange();
+    }
+  }).catch(() => {});
+
+  fetchDemandsFromFirestore().then((remoteDemands) => {
+    if (Array.isArray(remoteDemands)) {
+      const cleaned = remoteDemands.filter((f) => !isMockDemand(f));
+      localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(cleaned));
+      notifyStorageChange();
+    }
+  }).catch(() => {});
+
+  fetchAppointmentsFromFirestore().then((remoteAppointments) => {
+    if (Array.isArray(remoteAppointments)) {
+      const cleaned = remoteAppointments.filter((m) => !isMockMeeting(m));
+      localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(cleaned));
+      notifyStorageChange();
+    }
+  }).catch(() => {});
+
+  // 2. Continuous real-time Firestore listeners
   subscribeContactConfigFromFirestore((remoteConfig) => {
     if (remoteConfig && Object.keys(remoteConfig).length > 0) {
       localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(remoteConfig));
@@ -44,15 +128,17 @@ if (typeof window !== 'undefined') {
   });
 
   subscribeDemandsFromFirestore((remoteDemands) => {
-    if (remoteDemands && remoteDemands.length > 0) {
-      localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(remoteDemands));
+    if (Array.isArray(remoteDemands)) {
+      const cleaned = remoteDemands.filter((f) => !isMockDemand(f));
+      localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(cleaned));
       notifyStorageChange();
     }
   });
 
   subscribeAppointmentsFromFirestore((remoteAppointments) => {
-    if (remoteAppointments && remoteAppointments.length > 0) {
-      localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(remoteAppointments));
+    if (Array.isArray(remoteAppointments)) {
+      const cleaned = remoteAppointments.filter((m) => !isMockMeeting(m));
+      localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(cleaned));
       notifyStorageChange();
     }
   });
@@ -91,56 +177,22 @@ export function saveContactConfig(config: ContactConfig): ContactConfig {
 }
 
 // ========================
-// 2. Forms & Demands Database
+// 2. Forms & Demands Database (Clean, Dynamic from Firestore)
 // ========================
-const SAMPLE_FORMS: DemandForm[] = [
-  {
-    id: 'form-sample-1',
-    createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    name: 'Mariana Duarte',
-    businessName: 'Ateliê Flora Aromas',
-    segment: 'Comércio / Cosméticos Artesanais',
-    contactMethod: 'whatsapp',
-    contactValue: '(11) 98765-4321',
-    phone: '(11) 98765-4321',
-    email: 'mariana@floraaromas.com.br',
-    biggestNeed: 'Preciso calcular o preço de venda dos meus óleos essenciais e kits de presente sem ficar no prejuízo, além de organizar os pedidos que chegam pelo WhatsApp.',
-    businessDescription: 'Preciso calcular o preço de venda dos meus óleos essenciais e kits de presente sem ficar no prejuízo, além de organizar os pedidos que chegam pelo WhatsApp.',
-    projectStage: 'Já vendo mas sinto que estou pagando para trabalhar',
-    source: 'diagnostico_rapido',
-    origin: 'diagnostic_pedir',
-    status: 'Novo',
-    adminNotes: 'Interesse imediato em calculadora inteligente de precificação e catálogo no WhatsApp.'
-  },
-  {
-    id: 'form-sample-2',
-    createdAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    name: 'Carlos Alberto Lima',
-    businessName: 'Lima Manutenção Elétrica',
-    segment: 'Prestação de Serviços',
-    contactMethod: 'whatsapp',
-    contactValue: '(11) 97123-9988',
-    phone: '(11) 97123-9988',
-    email: 'carlos@limaeletrica.com.br',
-    biggestNeed: 'Controle de fluxo de caixa e envio de orçamentos rápidos em PDF para clientes de condomínios.',
-    businessDescription: 'Controle de fluxo de caixa e envio de orçamentos rápidos em PDF para clientes de condomínios.',
-    projectStage: 'Quero profissionalizar meus orçamentos',
-    source: 'formulario_contato',
-    origin: 'formulario_contato',
-    status: 'Em Análise',
-    adminNotes: 'Combinar reunião para demonstrar painel financeiro descomplicado.'
-  }
-];
-
 export function getDemandForms(): DemandForm[] {
   try {
     const raw = localStorage.getItem(FORMS_STORAGE_KEY);
-    let forms: DemandForm[] = raw ? JSON.parse(raw) : [...SAMPLE_FORMS];
+    let forms: DemandForm[] = raw ? JSON.parse(raw) : [];
+
+    // Filter out any mock entries
+    forms = forms.filter((f) => !isMockDemand(f));
 
     // Check if there are scheduled meetings not yet in forms
     const meetingsRaw = localStorage.getItem(MEETINGS_STORAGE_KEY);
     if (meetingsRaw) {
-      const meetings: MeetingAppointment[] = JSON.parse(meetingsRaw);
+      const meetings: MeetingAppointment[] = JSON.parse(meetingsRaw).filter(
+        (m: MeetingAppointment) => !isMockMeeting(m)
+      );
       let added = false;
       meetings.forEach((m) => {
         const demandId = `demand-from-${m.id}`;
@@ -184,9 +236,6 @@ export function getDemandForms(): DemandForm[] {
       }
     }
 
-    if (!raw && forms.length > 0) {
-      localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(forms));
-    }
     return forms;
   } catch (e) {
     console.error('Error loading demand forms', e);
@@ -210,7 +259,7 @@ export function saveDemandForm(
     status: formData.status || 'Novo'
   };
 
-  const updated = [newForm, ...forms];
+  const updated = [newForm, ...forms.filter((f) => f.id !== newForm.id)];
   localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(updated));
   saveDemandToFirestore(newForm);
   notifyStorageChange();
@@ -248,53 +297,26 @@ export function deleteDemandForm(id: string): DemandForm[] {
 }
 
 // ========================
-// 3. Appointments & Integrated Meeting Forms
+// 3. Appointments & Integrated Meeting Forms (Clean, Dynamic from Firestore)
 // ========================
-const SAMPLE_MEETINGS: MeetingAppointment[] = [
-  {
-    id: 'meet-sample-1',
-    clientName: 'Carla Vasconcelos',
-    clientEmail: 'carla@vasconcelosdoces.com.br',
-    clientPhone: '(11) 98888-2233',
-    topic: 'Implantação de Cálculo de Preço Inteligente e Catálogo Digital',
-    date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
-    time: '14:00',
-    durationMinutes: 45,
-    meetLink: 'https://meet.google.com/fxx-ctnv-hgm',
-    status: 'confirmed',
-    createdAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    confidentialityAccepted: true,
-    diagnosticNotes: {
-      problemDescription: 'Trabalha 14 horas por dia confeitando bolos e doces finos, mas não sabe a margem líquida real de cada bolo. Perde pedidos no WhatsApp por demora em passar orçamento.',
-      businessSegment: 'Confeitaria Artesanal de Alto Padrão',
-      currentTools: 'Caderno espiral e calculadora do celular; anotações avulsas no WhatsApp.',
-      urgencyLevel: 'alta',
-      recommendedSolution: 'Calculadora de Precificação Dinâmica (insumos + horas trabalhadas) + Catálogo digital enxuto.',
-      estimatedBudget: 'R$ 1.800 a R$ 2.400',
-      meetingSummary: 'Cliente muito receptiva. Já enviou tabela de ingredientes principais para montagem do protótipo.',
-      nextSteps: 'Apresentar protótipo navegável na quinta-feira às 14h.',
-      opportunityStatus: 'proposta_enviada'
-    }
-  }
-];
-
 export function getAdminAppointments(): MeetingAppointment[] {
   try {
     const raw = localStorage.getItem(MEETINGS_STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(SAMPLE_MEETINGS));
-      return SAMPLE_MEETINGS;
-    }
+    if (!raw) return [];
+
     const parsed: MeetingAppointment[] = JSON.parse(raw);
+    const cleaned = parsed.filter((m) => !isMockMeeting(m));
+
     let changed = false;
-    const sanitized = parsed.map((m) => {
+    const sanitized = cleaned.map((m) => {
       if (!m.meetLink || m.meetLink.includes('beg-4you-meet')) {
         changed = true;
         return { ...m, meetLink: 'https://meet.google.com/fxx-ctnv-hgm' };
       }
       return m;
     });
-    if (changed) {
+
+    if (changed || sanitized.length !== parsed.length) {
       localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(sanitized));
     }
     return sanitized;
@@ -428,6 +450,36 @@ export function updateMeetingDiagnostic(
   localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(updated));
   if (modifiedAppt) {
     saveAppointmentToFirestore(modifiedAppt);
+
+    // Also synchronize updated notes to the corresponding demand in Firestore
+    const demandId = `demand-from-${meetingId}`;
+    const diag = (modifiedAppt as MeetingAppointment).diagnosticNotes;
+    const statusLabel =
+      (modifiedAppt as MeetingAppointment).status === 'cancelled'
+        ? 'Cancelado'
+        : diag?.opportunityStatus === 'fechado'
+        ? 'Concluído'
+        : diag?.opportunityStatus === 'proposta_enviada'
+        ? 'Proposta Enviada'
+        : diag?.opportunityStatus === 'proposta_elaboracao'
+        ? 'Proposta em Elaboração'
+        : diag?.opportunityStatus === 'reuniao_realizada'
+        ? 'Reunião Realizada'
+        : 'Reunião Agendada';
+
+    const notesParts = [
+      `Reunião: ${(modifiedAppt as MeetingAppointment).date.split('-').reverse().join('/')} às ${(modifiedAppt as MeetingAppointment).time}`,
+      diag?.recommendedSolution ? `Solução: ${diag.recommendedSolution}` : '',
+      diag?.estimatedBudget ? `Orçamento: ${diag.estimatedBudget}` : '',
+      diag?.nextSteps ? `Próximos passos: ${diag.nextSteps}` : '',
+      diag?.meetingSummary ? `Anotações: ${diag.meetingSummary}` : ''
+    ].filter(Boolean).join(' | ');
+
+    updateDemandForm(demandId, {
+      status: statusLabel,
+      adminNotes: notesParts,
+      businessDescription: diag?.currentChallenges || diag?.problemDescription || (modifiedAppt as MeetingAppointment).topic
+    });
   }
   notifyStorageChange();
   return updated;

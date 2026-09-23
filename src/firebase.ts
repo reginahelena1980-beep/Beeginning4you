@@ -7,13 +7,15 @@ import {
   collection,
   onSnapshot,
   getDoc,
+  getDocs,
+  getDocFromServer,
   serverTimestamp
 } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ContactConfig, DemandForm, MeetingAppointment } from './types';
 
-// Provided Firebase credentials
+// Provided Firebase credentials for Beeginning 4 you
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDVXVS2FzKaGZcn3IALp5av6WDZaN_2vsc",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "beegining4you.firebaseapp.com",
@@ -36,10 +38,87 @@ export const CONTACT_CONFIG_DOC = 'contact_config';
 export const DEMANDS_COLLECTION = 'demands';
 export const APPOINTMENTS_COLLECTION = 'appointments';
 
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.warn('Firestore Operation Notice:', JSON.stringify(errInfo));
+  return errInfo;
+}
+
+// Connection test on boot
+export async function testFirestoreConnection() {
+  try {
+    await getDocFromServer(doc(db, SETTINGS_COLLECTION, CONTACT_CONFIG_DOC));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('[Firebase] Client is offline or establishing connection.');
+    }
+  }
+}
+if (typeof window !== 'undefined') {
+  testFirestoreConnection();
+}
+
 // -------------------------------------------------------------
 // 1. Contact Configuration in Firestore
 // -------------------------------------------------------------
+export async function fetchContactConfigFromFirestore(): Promise<ContactConfig | null> {
+  const path = `${SETTINGS_COLLECTION}/${CONTACT_CONFIG_DOC}`;
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, CONTACT_CONFIG_DOC);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data() as ContactConfig;
+    }
+    return null;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.GET, path);
+    return null;
+  }
+}
+
 export async function saveContactConfigToFirestore(config: ContactConfig): Promise<void> {
+  const path = `${SETTINGS_COLLECTION}/${CONTACT_CONFIG_DOC}`;
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, CONTACT_CONFIG_DOC);
     await setDoc(docRef, {
@@ -47,13 +126,14 @@ export async function saveContactConfigToFirestore(config: ContactConfig): Promi
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error) {
-    console.warn('[Firebase] Could not save contact config to Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
 
 export function subscribeContactConfigFromFirestore(
   onUpdate: (config: ContactConfig) => void
 ): () => void {
+  const path = `${SETTINGS_COLLECTION}/${CONTACT_CONFIG_DOC}`;
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, CONTACT_CONFIG_DOC);
     return onSnapshot(docRef, (snapshot) => {
@@ -62,10 +142,10 @@ export function subscribeContactConfigFromFirestore(
         onUpdate(data);
       }
     }, (error) => {
-      console.warn('[Firebase] Snapshot error for contact config:', error);
+      handleFirestoreError(error, OperationType.GET, path);
     });
   } catch (error) {
-    console.warn('[Firebase] Error setting up contact config listener:', error);
+    handleFirestoreError(error, OperationType.GET, path);
     return () => {};
   }
 }
@@ -73,7 +153,24 @@ export function subscribeContactConfigFromFirestore(
 // -------------------------------------------------------------
 // 2. Demands (Forms / Diagnósticos) in Firestore
 // -------------------------------------------------------------
+export async function fetchDemandsFromFirestore(): Promise<DemandForm[]> {
+  try {
+    const colRef = collection(db, DEMANDS_COLLECTION);
+    const snap = await getDocs(colRef);
+    const items: DemandForm[] = [];
+    snap.forEach((docSnap) => {
+      items.push(docSnap.data() as DemandForm);
+    });
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return items;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, DEMANDS_COLLECTION);
+    return [];
+  }
+}
+
 export async function saveDemandToFirestore(demand: DemandForm): Promise<void> {
+  const path = `${DEMANDS_COLLECTION}/${demand.id}`;
   try {
     const docRef = doc(db, DEMANDS_COLLECTION, demand.id);
     await setDoc(docRef, {
@@ -81,16 +178,17 @@ export async function saveDemandToFirestore(demand: DemandForm): Promise<void> {
       syncedAt: new Date().toISOString()
     }, { merge: true });
   } catch (error) {
-    console.warn('[Firebase] Could not save demand to Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
 
 export async function deleteDemandFromFirestore(id: string): Promise<void> {
+  const path = `${DEMANDS_COLLECTION}/${id}`;
   try {
     const docRef = doc(db, DEMANDS_COLLECTION, id);
     await deleteDoc(docRef);
   } catch (error) {
-    console.warn('[Firebase] Could not delete demand from Firestore:', error);
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 
@@ -108,10 +206,10 @@ export function subscribeDemandsFromFirestore(
       items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       onUpdate(items);
     }, (error) => {
-      console.warn('[Firebase] Snapshot error for demands:', error);
+      handleFirestoreError(error, OperationType.LIST, DEMANDS_COLLECTION);
     });
   } catch (error) {
-    console.warn('[Firebase] Error setting up demands listener:', error);
+    handleFirestoreError(error, OperationType.LIST, DEMANDS_COLLECTION);
     return () => {};
   }
 }
@@ -119,7 +217,24 @@ export function subscribeDemandsFromFirestore(
 // -------------------------------------------------------------
 // 3. Appointments (Reuniões Google Meet) in Firestore
 // -------------------------------------------------------------
+export async function fetchAppointmentsFromFirestore(): Promise<MeetingAppointment[]> {
+  try {
+    const colRef = collection(db, APPOINTMENTS_COLLECTION);
+    const snap = await getDocs(colRef);
+    const items: MeetingAppointment[] = [];
+    snap.forEach((docSnap) => {
+      items.push(docSnap.data() as MeetingAppointment);
+    });
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return items;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, APPOINTMENTS_COLLECTION);
+    return [];
+  }
+}
+
 export async function saveAppointmentToFirestore(appointment: MeetingAppointment): Promise<void> {
+  const path = `${APPOINTMENTS_COLLECTION}/${appointment.id}`;
   try {
     const docRef = doc(db, APPOINTMENTS_COLLECTION, appointment.id);
     await setDoc(docRef, {
@@ -127,16 +242,17 @@ export async function saveAppointmentToFirestore(appointment: MeetingAppointment
       syncedAt: new Date().toISOString()
     }, { merge: true });
   } catch (error) {
-    console.warn('[Firebase] Could not save appointment to Firestore:', error);
+    handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
 
 export async function deleteAppointmentFromFirestore(id: string): Promise<void> {
+  const path = `${APPOINTMENTS_COLLECTION}/${id}`;
   try {
     const docRef = doc(db, APPOINTMENTS_COLLECTION, id);
     await deleteDoc(docRef);
   } catch (error) {
-    console.warn('[Firebase] Could not delete appointment from Firestore:', error);
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 
@@ -154,10 +270,10 @@ export function subscribeAppointmentsFromFirestore(
       items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       onUpdate(items);
     }, (error) => {
-      console.warn('[Firebase] Snapshot error for appointments:', error);
+      handleFirestoreError(error, OperationType.LIST, APPOINTMENTS_COLLECTION);
     });
   } catch (error) {
-    console.warn('[Firebase] Error setting up appointments listener:', error);
+    handleFirestoreError(error, OperationType.LIST, APPOINTMENTS_COLLECTION);
     return () => {};
   }
 }

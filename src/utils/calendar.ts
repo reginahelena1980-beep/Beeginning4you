@@ -10,12 +10,12 @@ export function getOfficialEmail(): string {
 }
 
 export function getOfficialWhatsApp(): string {
-  return getContactConfig().whatsappNumber || '5511999999999';
+  return getContactConfig().whatsappNumber || '';
 }
 
 export const FIXED_GOOGLE_MEET_URL = 'https://meet.google.com/fxx-ctnv-hgm';
 export const OFFICIAL_EMAIL = 'contato@beeginning4you.com.br';
-export const OFFICIAL_WHATSAPP = '5511999999999';
+export const OFFICIAL_WHATSAPP = '';
 
 const STORAGE_KEY = 'beeginning_scheduled_meetings_v1';
 

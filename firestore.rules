@@ -2,23 +2,35 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Configurações públicas do site (WhatsApp oficial, link do Google Meet, foto de perfil)
+
+    // Configurações públicas do site (WhatsApp oficial, link da sala Meet, foto de perfil)
     match /settings/{settingId} {
-      allow read: if true;
-      allow write: if true;
+      allow get, list: if true;
+      allow create, update: if request.resource.data.email is string 
+                            && request.resource.data.meetUrl is string;
+      allow delete: if false;
     }
 
     // Demandas e diagnósticos enviados pelos clientes no site
     match /demands/{demandId} {
-      allow create: if request.resource.data.name is string;
-      allow read, update, delete: if true;
+      allow get, list: if true;
+      allow create: if request.resource.data.name is string 
+                    && request.resource.data.name.size() > 0 
+                    && request.resource.data.name.size() <= 200;
+      allow update: if request.resource.data.name is string;
+      allow delete: if true;
     }
 
-    // Agendamentos de reuniões Google Meet
+    // Agendamentos de reuniões Google Meet e notas integradas
     match /appointments/{appointmentId} {
-      allow create: if request.resource.data.clientName is string;
-      allow read, update, delete: if true;
+      allow get, list: if true;
+      allow create: if request.resource.data.clientName is string 
+                    && request.resource.data.clientName.size() > 0 
+                    && request.resource.data.clientName.size() <= 200
+                    && request.resource.data.date is string 
+                    && request.resource.data.time is string;
+      allow update: if request.resource.data.clientName is string;
+      allow delete: if true;
     }
 
     // Bloqueio padrão para todas as outras coleções não autorizadas

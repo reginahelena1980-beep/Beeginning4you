@@ -1,0 +1,85 @@
+{
+  "entities": {
+    "ContactConfig": {
+      "title": "ContactConfig",
+      "description": "Configurações globais de canais de atendimento e contato oficial",
+      "type": "object",
+      "properties": {
+        "whatsappNumber": { "type": "string" },
+        "whatsappDisplay": { "type": "string" },
+        "whatsappMessage": { "type": "string" },
+        "email": { "type": "string" },
+        "meetUrl": { "type": "string" },
+        "fixedMeetUrl": { "type": "string" },
+        "businessHours": { "type": "string" },
+        "adminPassword": { "type": "string" },
+        "adminPasswordHash": { "type": "string" },
+        "profilePhotoUrl": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "meetUrl"]
+    },
+    "Demand": {
+      "title": "Demand",
+      "description": "Demandas, diagnósticos e formulários de contato enviados por clientes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "businessName": { "type": "string" },
+        "segment": { "type": "string" },
+        "contactMethod": { "type": "string" },
+        "contactValue": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "biggestNeed": { "type": "string" },
+        "businessDescription": { "type": "string" },
+        "projectStage": { "type": "string" },
+        "source": { "type": "string" },
+        "origin": { "type": "string" },
+        "status": { "type": "string" },
+        "adminNotes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "syncedAt": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Agendamentos de reuniões Google Meet com diagnóstico e proposta integrados",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "clientPhone": { "type": "string" },
+        "topic": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "meetLink": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "confidentialityAccepted": { "type": "boolean" },
+        "diagnosticNotes": { "type": "object" },
+        "syncedAt": { "type": "string" }
+      },
+      "required": ["clientName", "date", "time"]
+    }
+  },
+  "firestore": {
+    "/settings/{settingId}": {
+      "schema": "ContactConfig",
+      "description": "Armazena configurações globais como link da sala Meet, WhatsApp e foto de perfil"
+    },
+    "/demands/{demandId}": {
+      "schema": "Demand",
+      "description": "Armazena solicitações de contato, diagnósticos rápidos e demandas"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Armazena agendamentos de reuniões e fichas de diagnóstico"
+    }
+  }
+}
