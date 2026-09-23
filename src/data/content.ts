@@ -87,7 +87,7 @@ export const REAL_PROJECT_EXAMPLES: RealProjectExample[] = [
   },
   {
     id: 'desenvolvimento-desta-pagina',
-    title: 'Desenvolvimento Desta Plataforma Web (Beeginning 4 you)',
+    title: 'Desenvolvimento de Plataforma We',
     badge: 'Projeto Real • Plataforma Autoral',
     tagline: 'Arquitetura digital refinada, agendamento de reuniões, compromisso LGPD e banco de demandas',
     iconName: 'Globe',
@@ -445,7 +445,7 @@ export const REAL_PROJECT_EXAMPLES_EN: RealProjectExample[] = [
   },
   {
     id: 'desenvolvimento-desta-pagina',
-    title: 'Development of This Web Platform (Beeginning 4 you)',
+    title: 'Development of Web Platform',
     badge: 'Real Project • Custom Platform',
     tagline: 'Refined digital architecture, appointment booking, privacy compliance, and intake desk',
     iconName: 'Globe',
