@@ -36,11 +36,11 @@ export const TRANSLATIONS = {
       badge2: 'Quem está por trás',
       title2: 'Olá, sou a Regina.',
       subtitle2: 'Criadora da Beeginning 4 you',
-      p2_1: 'Durante mais de 22 anos no universo corporativo, atuei no cruzamento entre processos, números, sistemas e pessoas. Vi de perto como grandes empresas investem milhões para automatizar tarefas simples, enquanto pequenos empreendedores muitas vezes sofrem no escuro com planilhas quebradas, cadernos perdidos e mensagens sem resposta no WhatsApp.',
+      p2_1: 'Durante mais de 30 anos no universo corporativo, atuei no cruzamento entre processos, números, sistemas e pessoas. Vi de perto como grandes empresas investem milhões para automatizar tarefas simples, enquanto pequenos empreendedores muitas vezes sofrem no escuro com planilhas quebradas, cadernos perdidos e mensagens sem resposta no WhatsApp.',
       p2_2: 'Aprendi que tecnologia boa não é a mais cara nem a mais sofisticada — é aquela que você entende em cinco minutos e que te devolve a tranquilidade de fechar o caixa no final do dia com a certeza de que tudo está sob controle.',
       p2_3: 'A Beeginning 4 you nasceu para colocar essa experiência a favor de quem constrói o próprio caminho: autônomos, pequenos comerciantes, criadores e prestadores de serviço que merecem ferramentas feitas na medida exata do seu negócio.',
       humanSeal: 'Atendimento direto, humano e sem intermediários',
-      photoLegend: 'Regina • Criadora da Beeginning 4 you • 22+ anos no mundo corporativo',
+      photoLegend: 'Regina • Criadora da Beeginning 4 you • 30+ anos no mundo corporativo',
 
       badge3: 'Competências e Abordagem',
       title3: 'O que eu trago comigo',
@@ -73,7 +73,7 @@ export const TRANSLATIONS = {
       subtitle4: 'Como duas décadas de vivência se transformaram em soluções práticas para pequenos negócios.',
       timeline4: [
         {
-          period: '22+ Anos no Mundo Corporativo',
+          period: '30+ Anos no Mundo Corporativo',
           headline: 'A base sólida em processos, governança e sistemas',
           text: 'Atuação aprofundada em ambientes corporativos de alta exigência, lidando diariamente com fluxos financeiros complexos, conciliações, integração entre departamentos e implementação de tecnologias de gestão.'
         },
@@ -227,11 +227,11 @@ export const TRANSLATIONS = {
       badge2: 'Who is behind it',
       title2: 'Hi, I\'m Regina.',
       subtitle2: 'Founder of Beeginning 4 you',
-      p2_1: 'For over 22 years in the corporate world, I worked at the intersection of processes, numbers, systems, and people. I saw firsthand how large corporations invest millions to automate simple tasks, while small business owners struggle in the dark with broken spreadsheets, lost notebooks, and unanswered customer messages on WhatsApp.',
+      p2_1: 'For over 30 years in the corporate world, I worked at the intersection of processes, numbers, systems, and people. I saw firsthand how large corporations invest millions to automate simple tasks, while small business owners struggle in the dark with broken spreadsheets, lost notebooks, and unanswered customer messages on WhatsApp.',
       p2_2: 'I learned that great technology isn\'t the most expensive or convoluted — it\'s the one you can master in five minutes and gives you the peace of mind to close your register at the end of the day knowing everything is in order.',
       p2_3: 'Beeginning 4 you was born to bring that expertise to those carving out their own path: freelancers, independent retailers, creators, and service professionals who deserve tools built precisely for their scale.',
       humanSeal: 'Direct, personal, and human care — zero middlemen',
-      photoLegend: 'Regina • Founder of Beeginning 4 you • 22+ years in corporate business',
+      photoLegend: 'Regina • Founder of Beeginning 4 you • 30+ years in corporate business',
 
       badge3: 'Skills & Approach',
       title3: 'What I bring with me',
@@ -264,7 +264,7 @@ export const TRANSLATIONS = {
       subtitle4: 'How two decades of corporate experience turned into practical solutions for small businesses.',
       timeline4: [
         {
-          period: '22+ Years in the Corporate World',
+          period: '30+ Years in the Corporate World',
           headline: 'A solid foundation in processes, governance, and systems',
           text: 'In-depth experience in high-standard corporate environments, dealing daily with complex financial flows, reconciliations, interdepartmental integrations, and enterprise management tools.'
         },

@@ -173,9 +173,9 @@ export default function AboutUs({ onOpenConversation }: AboutUsProps) {
                 </p>
                 <p>
                   {isEn ? (
-                    <>For more than <strong>22 years in the corporate environment</strong>, I worked directly with business processes, financial metrics, systems, technology, and people.</>
+                    <>For more than <strong>30 years in the corporate environment</strong>, I worked directly with business processes, financial metrics, systems, technology, and people.</>
                   ) : (
-                    <>Foram mais de <strong>22 anos vivendo o mundo corporativo</strong>, trabalhando com processos, números, tecnologia, sistemas e pessoas.</>
+                    <>Foram mais de <strong>30 anos vivendo o mundo corporativo</strong>, trabalhando com processos, números, tecnologia, sistemas e pessoas.</>
                   )}
                 </p>
                 <p>
