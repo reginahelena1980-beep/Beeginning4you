@@ -12,21 +12,19 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-const LANGUAGE_STORAGE_KEY = 'beeginning_language_pref_v1';
+const LANGUAGE_STORAGE_KEY = 'beeginning_language_pref_v2';
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
+      // Clear legacy v1 auto-detected key if present
+      localStorage.removeItem('beeginning_language_pref_v1');
       const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY) as Language | null;
       if (saved === 'pt' || saved === 'en') {
         return saved;
       }
-      // Auto-detect browser language if available
-      const browserLang = navigator.language?.toLowerCase() || '';
-      if (browserLang.startsWith('en')) {
-        return 'en';
-      }
     }
+    // Default initial language is strictly Portuguese (pt)
     return 'pt';
   });
 
