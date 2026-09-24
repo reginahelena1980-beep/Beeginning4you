@@ -16,98 +16,95 @@ export const TRANSLATIONS = {
       solutions: 'O Que Fazemos',
       audience: 'Para Quem',
       projects: 'Projetos Reais',
+      booking: 'Agendamento',
       cta: 'Vamos conversar?',
+      diagnostic: 'Pedir diagnóstico',
+      ourSolutions: 'Nossas soluções',
     },
     hero: {
       sloganLine1: 'Você traz',
       sloganLine2: 'a ideia.',
       sloganLine3: 'A gente faz',
       sloganLine4: 'acontecer.',
+      subtitle: 'Consultoria e Soluções Digitais Sob Medida para o seu negócio.',
       solutionsBtn: 'Nossas Soluções',
       altImage: 'Espaço de trabalho inspirador com notebook ASUS Vivobook rosé e café na mesa de madeira',
     },
     about: {
-      badge1: 'A Beeginning',
-      title1: 'Não é sobre ter todas as respostas. É sobre começar.',
-      p1_1: 'A maioria das boas ideias morre na gaveta porque parece difícil demais tirá-las da cabeça: falta tempo, sobram ferramentas complicadas e ninguém tem paciência para falar a língua real de quem está no campo de batalha.',
-      p1_2: 'Na',
-      p1_3: 'nós transformamos inquietações em ferramentas digitais úteis, leves e com a sua cara. Sem jargões técnicos, sem mensalidades desnecessárias e sem te afastar do que você ama fazer.',
-
-      badge2: 'Quem está por trás',
-      title2: 'Olá, sou a Regina.',
-      subtitle2: 'Criadora da Beeginning 4 you',
-      p2_1: 'Durante mais de 30 anos no universo corporativo, atuei no cruzamento entre processos, números, sistemas e pessoas. Vi de perto como grandes empresas investem milhões para automatizar tarefas simples, enquanto pequenos empreendedores muitas vezes sofrem no escuro com planilhas quebradas, cadernos perdidos e mensagens sem resposta no WhatsApp.',
-      p2_2: 'Aprendi que tecnologia boa não é a mais cara nem a mais sofisticada — é aquela que você entende em cinco minutos e que te devolve a tranquilidade de fechar o caixa no final do dia com a certeza de que tudo está sob controle.',
-      p2_3: 'A Beeginning 4 you nasceu para colocar essa experiência a favor de quem constrói o próprio caminho: autônomos, pequenos comerciantes, criadores e prestadores de serviço que merecem ferramentas feitas na medida exata do seu negócio.',
+      badge1: 'Quem Somos',
+      quote: '"Não é sobre ter todas as respostas. É sobre começar."',
+      quoteLead: 'Toda grande realização nasceu de um primeiro passo simples: dar contorno a uma inquietação, colocar no papel e construir lado a lado sem complicação.',
+      bioBadge: 'QUEM ESTÁ POR TRÁS',
+      bioGreeting: 'Olá, sou a Regina.',
+      bioRole: '',
+      bioPhotoRole: 'Criadora da Beegining 4 You',
+      photoLegend: 'Regina • Criadora da Beegining 4 You • 30+ anos no mundo corporativo',
       humanSeal: 'Atendimento direto, humano e sem intermediários',
-      photoLegend: 'Regina • Criadora da Beeginning 4 you • 30+ anos no mundo corporativo',
+      bioP1: 'Eu sempre gostei de entender como as coisas funcionam — e, principalmente, de descobrir como poderiam funcionar melhor.',
+      bioP2Part1: 'Foram mais de ',
+      bioP2Bold: '30 anos vivendo o mundo corporativo',
+      bioP2Part2: ', trabalhando com processos, números, tecnologia, sistemas e pessoas.',
+      bioP3: 'Nesse caminho, aprendi a olhar para um problema por diferentes ângulos: entender o que realmente precisa ser resolvido, organizar a complexidade e transformar uma ideia em algo que funcione de verdade.',
+      bioP4: 'Mas também descobri que essa habilidade não precisava ficar restrita às grandes empresas.',
+      bioHighlightPart1: 'A ',
+      bioHighlightBold: 'Beeginning 4 you',
+      bioHighlightPart2: ' nasceu daí. Da vontade de usar toda essa experiência para ajudar pessoas e pequenos negócios a tirarem ideias do papel — de um jeito mais simples, próximo e possível.',
+      bioQuote: '"Porque eu acredito que uma boa solução não precisa ser complicada. Ela precisa fazer sentido para quem vai usá-la."',
 
-      badge3: 'Competências e Abordagem',
-      title3: 'O que eu trago comigo',
-      subtitle3: 'Mais do que linhas de código ou telas bonitas, nosso trabalho combina bagagem analítica, sensibilidade e presença lado a lado.',
-      cards3: [
+      competenciesBadge: 'Competências',
+      competenciesTitle: 'O Que Eu Trago Comigo',
+      competenciesSubtitle: 'Mais do que linhas de código, nosso trabalho combina bagagem analítica, sensibilidade e presença lado a lado.',
+      competencies: [
         {
+          id: 'processos',
+          icon: '🧩',
           title: 'Visão de Processos',
-          desc: 'Identificar gargalos, encurtar caminhos e organizar fluxos para que você não precise refazer a mesma tarefa duas vezes.'
+          desc: 'Identificar gargalos, simplificar caminhos e organizar fluxos para que você não precise refazer a mesma tarefa duas vezes.'
         },
         {
+          id: 'criativo',
+          icon: '💡',
           title: 'Pensamento Criativo',
           desc: 'Encontrar saídas elegantes e originais que valorizem a identidade autoral do seu negócio sem fórmulas prontas.'
         },
         {
+          id: 'negocios',
+          icon: '📊',
           title: 'Experiência com Negócios',
-          desc: 'Mais de duas décadas entendendo métricas, viabilidade, fluxo de caixa e o que realmente move o ponteiro do lucro.'
+          desc: 'Décadas entendendo métricas, viabilidade, fluxo de caixa e o que realmente move o ponteiro de resultados.'
         },
         {
+          id: 'tecnologia',
+          icon: '💻',
+          title: 'Tecnologia e Sistemas',
+          desc: 'Ferramentas modernas, automações e arquiteturas leves colocadas a serviço das pessoas — e nunca o contrário.'
+        },
+        {
+          id: 'detalhes',
+          icon: '🔎',
           title: 'Olhar para Detalhes',
-          desc: 'Cuidado obsessivo com tipografia, legibilidade, clareza das mensagens e a facilidade do clique para o seu cliente.'
+          desc: 'Cuidado atencioso com tipografia, legibilidade, clareza das mensagens e a facilidade do clique para o seu cliente.'
         },
         {
+          id: 'lado-a-lado',
+          icon: '🤝',
           title: 'Construção Lado a Lado',
-          desc: 'Você não recebe um produto frio e um manual de 80 páginas. Construímos juntos, tirando dúvidas em tempo real.'
+          desc: 'Você não recebe um sistema frio e distante. Construímos juntos, alinhando tudo passo a passo em tempo real.'
         }
-      ],
-
-      badge4: 'Linha do Tempo & Trajetória',
-      title4: 'O fio condutor dessa jornada',
-      subtitle4: 'Como duas décadas de vivência se transformaram em soluções práticas para pequenos negócios.',
-      timeline4: [
-        {
-          period: '30+ Anos no Mundo Corporativo',
-          headline: 'A base sólida em processos, governança e sistemas',
-          text: 'Atuação aprofundada em ambientes corporativos de alta exigência, lidando diariamente com fluxos financeiros complexos, conciliações, integração entre departamentos e implementação de tecnologias de gestão.'
-        },
-        {
-          period: 'O Despertar da Dor Real',
-          headline: 'O contraste entre grandes empresas e quem empreende sozinho',
-          text: 'A constatação clara de que os pequenos negócios — os que mais geram empregos e afeto — eram os mais desassistidos pelo mercado tech, reféns de plataformas engessadas e suporte robótico.'
-        },
-        {
-          period: 'Hoje • Beeginning 4 you',
-          headline: 'Ideias que ganham forma. Soluções que fazem sentido.',
-          text: 'A união entre a maturidade técnica de processos e o calor humano da escuta atenta, criando ferramentas sob medida que dão autonomia verdadeira ao empreendedor.'
-        }
-      ],
-
-      badge5: 'O Lado Pessoal e Criativo',
-      title5: 'O encontro entre lógica e criatividade',
-      p5_1: 'Acredito que os melhores projetos nascem quando a exatidão dos números se encontra com o design afetivo. Uma planilha não precisa ser cinza e amedrontadora; um sistema de agendamento não precisa parecer uma repartição pública.',
-      p5_2: 'Por trás de cada botão ou linha de processo que criamos, existe o compromisso de encantar o seu cliente e tornar o seu dia a dia mais leve e prazeroso.',
-
-      badge6: 'Como eu penso',
-      quote6: '“Eu não começo pela ferramenta. Começo pelo problema.”',
-      p6_desc: 'Não importa se vamos usar uma página web, um formulário enxuto ou uma integração simples: o ponto de partida é sempre o que está travando o seu tempo ou o seu faturamento hoje.',
-
-      badge7: 'Por que Beeginning 4 you?',
-      title7: 'A essência por trás do nome e da nossa marca',
-      p7_1: 'O nome carrega o jogo de palavras entre **Bee** (a abelha trabalhadora, precisa e colaborativa) e **Beginning** (o recomeço, o primeiro passo, a coragem de começar algo novo). O **4 you** reforça que cada entrega é feita sob medida para a sua realidade única.',
-      p7_wings: 'As asas da abelha são em formato de infinito (∞) e na matemática, o infinito não é um número comum, mas sim um conceito que descreve algo sem fim, sem limite ou uma quantidade que cresce para além de qualquer valor finito.',
-      p7_bottom: 'Essa linha contínua reflete nosso propósito: ser o ponto de partida de um ciclo ilimitado de evolução e autonomia para o seu negócio.',
-
-      ctaTitle1: 'Você traz a ideia.',
-      ctaTitle2: 'A gente faz acontecer.',
-      ctaDesc: 'Vamos conversar sobre o seu negócio sem compromisso e sem termos complicados?',
-      ctaBtn: 'Agendar ou Iniciar Conversa',
+      ]
+    },
+    essence: {
+      badge: 'A Essência da Marca',
+      title: 'A Essência da Marca',
+      subtitle: 'O significado por trás da Beeginning 4 you: acolhimento, dedicação e movimento contínuo.',
+      beeTitle: 'BEE (A Abelha)',
+      beeDesc: 'Inspirada no trabalho dedicado, ágil e colaborativo das abelhas: cada polinização conecta pontos e floresce resultados consistentes que sustentam a comunidade.',
+      beginningTitle: 'BEGINNING (O Começo)',
+      beginningDesc: 'A coragem de dar o primeiro passo. Você não precisa ter tudo perfeito para começar; o essencial é tirar a ideia da cabeça e dar-lhe contorno tangível.',
+      fourYouTitle: '4 YOU (Para Você)',
+      fourYouDesc: 'Em um tom de mostarda , simboliza soluções feitas sob medida para o seu negócio. Nada de fórmulas genéricas ou pacotes engessados: criamos o que faz sentido para você.',
+      infiniteTitle: 'O Traço Contínuo & O Infinito',
+      infiniteDesc: 'As asas da abelha desenhadas em traço contínuo formam o símbolo do infinito (∞). Representa o ciclo ininterrupto de evolução, clareza e novas possibilidades para o seu negócio.'
     },
     philosophy: {
       tag: 'Construção e Recomeços',
@@ -207,98 +204,95 @@ export const TRANSLATIONS = {
       solutions: 'What We Do',
       audience: 'Who It\'s For',
       projects: 'Real Projects',
+      booking: 'Booking',
       cta: 'Let\'s talk?',
+      diagnostic: 'Request diagnostic',
+      ourSolutions: 'Our solutions',
     },
     hero: {
       sloganLine1: 'You bring',
       sloganLine2: 'the idea.',
       sloganLine3: 'We make it',
       sloganLine4: 'happen.',
+      subtitle: 'Bespoke Consulting & Digital Solutions for Your Business.',
       solutionsBtn: 'Our Solutions',
       altImage: 'Inspiring workspace with ASUS Vivobook laptop in rose gold and coffee on a wooden desk',
     },
     about: {
-      badge1: 'The Beeginning',
-      title1: 'It\'s not about having all the answers. It\'s about starting.',
-      p1_1: 'Most great ideas die in a drawer because getting them out of your head feels too daunting: time is scarce, software is overly complicated, and nobody speaks the everyday language of small business owners.',
-      p1_2: 'At',
-      p1_3: 'we turn aspirations into useful, lightweight, custom digital tools with your business\'s DNA. No technical jargon, no unnecessary monthly fees, and no distraction from what you love doing most.',
-
-      badge2: 'Who is behind it',
-      title2: 'Hi, I\'m Regina.',
-      subtitle2: 'Founder of Beeginning 4 you',
-      p2_1: 'For over 30 years in the corporate world, I worked at the intersection of processes, numbers, systems, and people. I saw firsthand how large corporations invest millions to automate simple tasks, while small business owners struggle in the dark with broken spreadsheets, lost notebooks, and unanswered customer messages on WhatsApp.',
-      p2_2: 'I learned that great technology isn\'t the most expensive or convoluted — it\'s the one you can master in five minutes and gives you the peace of mind to close your register at the end of the day knowing everything is in order.',
-      p2_3: 'Beeginning 4 you was born to bring that expertise to those carving out their own path: freelancers, independent retailers, creators, and service professionals who deserve tools built precisely for their scale.',
+      badge1: 'About Us',
+      quote: '"It\'s not about having all the answers. It\'s about starting."',
+      quoteLead: 'Every meaningful achievement was born from a simple first step: shaping an aspiration, bringing it into the world, and building side by side without friction.',
+      bioBadge: 'WHO IS BEHIND',
+      bioGreeting: 'Hi, I\'m Regina.',
+      bioRole: '',
+      bioPhotoRole: 'Creator of Beeginning 4 you',
+      photoLegend: 'Regina • Creator of Beeginning 4 you • 30+ years in the corporate world',
       humanSeal: 'Direct, personal, and human care — zero middlemen',
-      photoLegend: 'Regina • Founder of Beeginning 4 you • 30+ years in corporate business',
+      bioP1: 'I\'ve always loved understanding how things work — and, above all, discovering how they could work so much better.',
+      bioP2Part1: 'For over ',
+      bioP2Bold: '30 years in the corporate environment',
+      bioP2Part2: ', working with processes, numbers, technology, systems, and people.',
+      bioP3: 'Along this journey, I learned to look at problems from different perspectives: understanding what truly needs to be solved, organizing complexity, and transforming an idea into something that really works.',
+      bioP4: 'Yet I also realized this capability didn\'t need to be restricted to big corporations.',
+      bioHighlightPart1: ' ',
+      bioHighlightBold: 'Beeginning 4 you',
+      bioHighlightPart2: ' was born right there. From the desire to use all this experience to help individuals and small businesses bring ideas to life — in a simpler, closer, and achievable way.',
+      bioQuote: '"Because I believe a great solution does not need to be complicated. It needs to make sense to the person who will use it."',
 
-      badge3: 'Skills & Approach',
-      title3: 'What I bring with me',
-      subtitle3: 'More than code lines or neat screens, our work unites analytical depth, design sensitivity, and side-by-side companionship.',
-      cards3: [
+      competenciesBadge: 'Competencies',
+      competenciesTitle: 'What I Bring to Every Project',
+      competenciesSubtitle: 'More than code lines or neat screens, our work unites analytical depth, design sensitivity, and side-by-side companionship.',
+      competencies: [
         {
+          id: 'processos',
+          icon: '🧩',
           title: 'Process Architecture',
           desc: 'Spotting bottlenecks, trimming steps, and organizing workflows so you never have to repeat the same manual task twice.'
         },
         {
+          id: 'criativo',
+          icon: '💡',
           title: 'Creative Thinking',
           desc: 'Finding elegant, original paths that showcase the authentic identity of your business without pre-packaged formulas.'
         },
         {
+          id: 'negocios',
+          icon: '📊',
           title: 'Business Experience',
-          desc: 'Over two decades understanding metrics, viability, cash flow, and what truly moves the needle of profit.'
+          desc: 'Decades understanding metrics, viability, cash flow, and what truly moves the needle of profit.'
         },
         {
+          id: 'tecnologia',
+          icon: '💻',
+          title: 'Technology & Systems',
+          desc: 'Modern web tools, lean automations, and light architecture in service of human beings — never the other way around.'
+        },
+        {
+          id: 'detalhes',
+          icon: '🔎',
           title: 'Attention to Detail',
           desc: 'Thoughtful care with typography, readability, message clarity, and seamless click journeys for your customers.'
         },
         {
+          id: 'lado-a-lado',
+          icon: '🤝',
           title: 'Side-by-Side Co-creation',
-          desc: 'You won\'t receive a cold product and an 80-page manual. We build together, clarifying questions in real time.'
+          desc: 'You won\'t receive a cold product and a 80-page manual. We build together, aligning each step in real time.'
         }
-      ],
-
-      badge4: 'Timeline & Journey',
-      title4: 'The guiding thread of this journey',
-      subtitle4: 'How two decades of corporate experience turned into practical solutions for small businesses.',
-      timeline4: [
-        {
-          period: '30+ Years in the Corporate World',
-          headline: 'A solid foundation in processes, governance, and systems',
-          text: 'In-depth experience in high-standard corporate environments, dealing daily with complex financial flows, reconciliations, interdepartmental integrations, and enterprise management tools.'
-        },
-        {
-          period: 'Recognizing the Real Struggle',
-          headline: 'The stark contrast between giant firms and solo entrepreneurs',
-          text: 'The eye-opening realization that small businesses — the ones driving genuine human warmth and local jobs — were completely underserved by mainstream tech, trapped by bloated platforms and robotic support.'
-        },
-        {
-          period: 'Today • Beeginning 4 you',
-          headline: 'Ideas taking shape. Solutions that truly make sense.',
-          text: 'Blending technical process rigor with empathetic listening, crafting bespoke tools that provide authentic autonomy to independent entrepreneurs.'
-        }
-      ],
-
-      badge5: 'The Personal & Creative Side',
-      title5: 'The meeting point of logic and creativity',
-      p5_1: 'I believe the finest projects emerge when numeric precision joins hands with warm design. A spreadsheet doesn\'t have to be grey and intimidating; a booking system doesn\'t have to look like a tax bureau.',
-      p5_2: 'Behind every button or automated step we design lies a heartfelt commitment to delight your customer and make your day-to-day work lighter and more rewarding.',
-
-      badge6: 'How I think',
-      quote6: '“I don\'t start with the tool. I start with the problem.”',
-      p6_desc: 'Whether we implement a focused webpage, a streamlined intake form, or an automated workflow: the starting line is always what is draining your time or stalling your revenue right now.',
-
-      badge7: 'Why Beeginning 4 you?',
-      title7: 'The meaning behind the name and brand',
-      p7_1: 'The name carries a playful blend of **Bee** (the hard-working, precise, and collaborative bee) and **Beginning** (the fresh start, the first step, the courage to begin something new). The **4 you** emphasizes that every solution is tailored to your exact reality.',
-      p7_wings: 'The bee\'s wings are in the shape of infinity (∞), and in mathematics, infinity is not a common number, but rather a concept that describes something without end, without limit, or a quantity that expands beyond any finite value.',
-      p7_bottom: 'This continuous loop reflects our mission: to be the launchpad of an ongoing cycle of evolution and autonomy for your venture.',
-
-      ctaTitle1: 'You bring the idea.',
-      ctaTitle2: 'We make it happen.',
-      ctaDesc: 'Let\'s chat about your business with zero pressure and zero complicated buzzwords.',
-      ctaBtn: 'Book or Start a Conversation',
+      ]
+    },
+    essence: {
+      badge: 'Brand Essence',
+      title: 'The Essence of the Brand',
+      subtitle: 'The meaning behind Beeginning 4 you: warmth, dedication, and continuous forward momentum.',
+      beeTitle: 'BEE (The Bee)',
+      beeDesc: 'Inspired by the dedicated, agile, and collaborative labor of bees: each pollination connects points and blossoms into results that sustain the community.',
+      beginningTitle: 'BEGINNING (The Start)',
+      beginningDesc: 'The courage to take the first step. You do not need everything to be perfect to begin; what matters is bringing the idea into the physical world with tangible shape.',
+      fourYouTitle: '4 YOU (For You)',
+      fourYouDesc: 'In mustard, symbolizing tailored solutions crafted specifically for your business. No generic templates or rigid bundles: we build what makes sense for your operational reality.',
+      infiniteTitle: 'The Continuous Line & Infinity',
+      infiniteDesc: 'The bee wings drawn in a continuous line form the infinity symbol (∞). It represents an uninterrupted cycle of evolution, clarity, and boundless possibilities for your venture.'
     },
     philosophy: {
       tag: 'Crafting & Fresh Starts',

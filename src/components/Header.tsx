@@ -29,6 +29,7 @@ export default function Header({ onOpenConversation }: HeaderProps) {
     { label: t.nav.solutions, href: '#solucoes' },
     { label: t.nav.audience, href: '#para-quem' },
     { label: t.nav.projects, href: '#historias' },
+    { label: t.nav.booking, href: '#agendamento' },
   ];
 
   const handleNavClick = (e: MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -45,15 +46,25 @@ export default function Header({ onOpenConversation }: HeaderProps) {
       id="main-header"
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? 'bg-[#F9F9F8]/90 backdrop-blur-md shadow-xs border-b border-[#E8E8E5]'
+          ? 'bg-[#F9F9F8]/95 backdrop-blur-md shadow-xs border-b border-[#E8E8E5]'
           : 'bg-transparent py-2 sm:py-3'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20 w-full">
-          {/* Desktop Navigation: Aligned from the left boundary matching the hero panel below */}
+        <div className="flex items-center justify-between h-16 sm:h-20 w-full gap-4">
+          {/* Zone 1: Wordmark Brand Title */}
+          <a
+            href="#inicio"
+            onClick={(e) => handleNavClick(e, '#inicio')}
+            className="flex items-center gap-2 group text-[#181B1E] font-display font-extrabold text-base sm:text-lg tracking-tight hover:text-[#D99B26] transition-colors shrink-0"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-[#E5A93B] group-hover:scale-125 transition-transform" />
+            <span className="font-extrabold">Beeginning 4 You</span>
+          </a>
+
+          {/* Zone 2: Desktop Navigation Links */}
           <nav
-            className="hidden lg:flex items-center space-x-1 xl:space-x-1.5 pointer-events-auto -ml-2"
+            className="hidden lg:flex items-center space-x-1 xl:space-x-1.5 pointer-events-auto"
             aria-label={language === 'pt' ? 'Navegação Principal' : 'Main Navigation'}
           >
             {navLinks.map((link) => (
@@ -62,15 +73,15 @@ export default function Header({ onOpenConversation }: HeaderProps) {
                 href={link.href}
                 id={`nav-link-${link.href.replace('#', '')}`}
                 onClick={(e) => handleNavClick(e, link.href)}
-                className="px-3 xl:px-4 py-2 text-xs xl:text-sm font-medium text-[#3A3A3A] hover:text-[#1A1A1A] hover:bg-[#EBEBE8]/60 rounded-lg transition-colors whitespace-nowrap"
+                className="px-2.5 xl:px-3.5 py-2 text-xs xl:text-sm font-medium text-[#3A3A3A] hover:text-[#1A1A1A] hover:bg-[#EBEBE8]/60 rounded-lg transition-colors whitespace-nowrap"
               >
                 {link.label}
               </a>
             ))}
           </nav>
 
-          {/* Language Toggle & CTA Button (Desktop) */}
-          <div className="hidden sm:flex items-center gap-2.5 xl:gap-3 shrink-0 z-10 -mr-1 sm:mr-0">
+          {/* Zone 3: Language Toggle & CTA Button */}
+          <div className="hidden sm:flex items-center gap-2.5 xl:gap-3 shrink-0 z-10">
             <LanguageToggle />
 
             <button

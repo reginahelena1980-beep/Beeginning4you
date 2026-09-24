@@ -102,6 +102,11 @@ export default function Footer({ onOpenConversation, onOpenAdmin }: FooterProps)
                   {nav.projects}
                 </a>
               </li>
+              <li>
+                <a href="#agendamento" className="hover:text-[#E5A93B] transition-colors">
+                  {nav.booking}
+                </a>
+              </li>
             </ul>
           </div>
 

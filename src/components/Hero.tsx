@@ -5,11 +5,12 @@ import { useLanguage } from '../context/LanguageContext';
 import { TRANSLATIONS } from '../data/translations';
 
 interface HeroProps {
-  onOpenDiagnostic: () => void;
+  onOpenDiagnostic?: () => void;
+  onOpenConversation?: () => void;
   onSelectChallenge?: (challengeId: string) => void;
 }
 
-export default function Hero({ onOpenDiagnostic }: HeroProps) {
+export default function Hero({ onOpenDiagnostic, onOpenConversation }: HeroProps) {
   const { language } = useLanguage();
   const t = TRANSLATIONS[language];
 
@@ -41,15 +42,39 @@ export default function Hero({ onOpenDiagnostic }: HeroProps) {
                 <BeeLogo size="xl" layout="stacked" theme="light" showTagline={false} />
               </div>
 
-              {/* Minimalist Action Prompt */}
-              <div className="mt-6 sm:mt-8 flex items-center justify-center">
+              {/* Action Prompts: All 3 Core Buttons Active & Translated */}
+              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-2.5">
                 <button
                   id="hero-board-solutions"
-                  onClick={() => scrollToSection('#historias')}
-                  className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#181B1E] hover:bg-[#D99B26] text-white hover:text-[#181B1E] text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-sm active:scale-95 group"
+                  onClick={() => scrollToSection('#solucoes')}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#181B1E] hover:bg-[#D99B26] text-white hover:text-[#181B1E] text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-xs active:scale-95 group"
                 >
                   <span>{t.hero.solutionsBtn}</span>
                   <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
+                </button>
+
+                {onOpenConversation && (
+                  <button
+                    id="hero-board-talk"
+                    onClick={onOpenConversation}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#E5A93B] hover:bg-[#D99B26] text-[#1A1A1A] text-xs font-bold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <span>{t.nav.cta}</span>
+                  </button>
+                )}
+
+                <button
+                  id="hero-board-diagnostic"
+                  onClick={() => {
+                    if (onOpenDiagnostic) {
+                      onOpenDiagnostic();
+                    } else {
+                      scrollToSection('#agendamento');
+                    }
+                  }}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-[#FAF8F5] border border-[#D5D0C6] text-[#2E3136] text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-xs active:scale-95"
+                >
+                  <span>{t.nav.diagnostic}</span>
                 </button>
               </div>
             </div>
@@ -91,6 +116,11 @@ export default function Hero({ onOpenDiagnostic }: HeroProps) {
                     />
                   </svg>
                 </div>
+
+                {/* Subtitle / Slogan */}
+                <p className="text-sm sm:text-base lg:text-lg text-[#2E3136] font-medium pt-3 max-w-md leading-relaxed">
+                  {t.hero.subtitle}
+                </p>
               </div>
             </div>
           </div>

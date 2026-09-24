@@ -31,7 +31,6 @@ export function getSavedAppointments(): MeetingAppointment[] {
 }
 
 export function saveAppointment(appointment: MeetingAppointment): MeetingAppointment[] {
-  // Use integrated admin storage so diagnostic notes and demand records are automatically linked
   return saveAppointmentWithDiagnostic(appointment);
 }
 
@@ -90,7 +89,7 @@ export function rescheduleAppointmentInStorage(
 }
 
 /**
- * Generates Google Calendar web sync URL
+ * Generates Google Calendar web sync URL with official beeginning4you@gmail.com organizer
  */
 export function generateGoogleCalendarUrl(appointment: MeetingAppointment): string {
   const cleanDate = appointment.date.replace(/-/g, '');
@@ -111,14 +110,15 @@ export function generateGoogleCalendarUrl(appointment: MeetingAppointment): stri
   const title = encodeURIComponent(`Reunião Beeginning 4 You: Diagnóstico & Ideia de Negócio (${appointment.clientName})`);
   const details = encodeURIComponent(
     `Reunião Virtual de Alinhamento e Diagnóstico Digital - Beeginning 4 You\n\n` +
-    `👤 Cliente: ${appointment.clientName}\n` +
-    `📧 E-mail: ${appointment.clientEmail}\n` +
-    `📱 WhatsApp/Tel: ${appointment.clientPhone}\n` +
-    `💡 Assunto / Ideia: ${appointment.topic || 'Discussão inicial de solução digital'}\n\n` +
-    `🔗 Sala Fixa Google Meet: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
+    `📧 Remetente Oficial: ${OFFICIAL_EMAIL}\n` +
+    `👤 Participante / Cliente: ${appointment.clientName}\n` +
+    `📩 Destinatário: ${appointment.clientEmail}\n` +
+    `📱 WhatsApp/Telefone: ${appointment.clientPhone}\n` +
+    `💡 Assunto / Pauta: ${appointment.topic || 'Discussão inicial de solução digital'}\n\n` +
+    `💻 Sala Google Meet: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
     `🔒 COMPROMISSO DE SIGILO E LGPD:\n` +
     `A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018), utilizando-os exclusivamente para viabilizar o nosso contato e agendamentos.\n\n` +
-    `Canal oficial: ${OFFICIAL_EMAIL}`
+    `Canal Oficial: ${OFFICIAL_EMAIL}`
   );
   const location = encodeURIComponent(appointment.meetLink || FIXED_GOOGLE_MEET_URL);
   const attendees = encodeURIComponent(`${OFFICIAL_EMAIL},${appointment.clientEmail}`);
@@ -127,69 +127,255 @@ export function generateGoogleCalendarUrl(appointment: MeetingAppointment): stri
 }
 
 /**
- * Generates and triggers download of .ics calendar file
+ * Dispatches official confirmation email from beeginning4you@gmail.com to client via server API
  */
-export function downloadIcsFile(appointment: MeetingAppointment): void {
-  const cleanDate = appointment.date.replace(/-/g, '');
-  const [hours, minutes] = appointment.time.split(':').map(Number);
-  
-  const startHoursStr = String(hours).padStart(2, '0');
-  const startMinutesStr = String(minutes).padStart(2, '0');
-  const startTimeStr = `${startHoursStr}${startMinutesStr}00`;
+export async function sendOfficialConfirmationEmail(
+  appointment: MeetingAppointment,
+  isEn = false
+): Promise<{ success: boolean; message?: string }> {
+  const dateFormatted = appointment.date.split('-').reverse().join('/');
+  const subject = isEn
+    ? `Meeting Confirmed: Beeginning 4 you (${dateFormatted} at ${appointment.time})`
+    : `Confirmação de Reunião: Beeginning 4 you (${dateFormatted} às ${appointment.time})`;
 
-  const totalMinutes = hours * 60 + minutes + (appointment.durationMinutes || 45);
-  const endHours = Math.floor(totalMinutes / 60);
-  const endMinutes = totalMinutes % 60;
-  const endHoursStr = String(endHours).padStart(2, '0');
-  const endMinutesStr = String(endMinutes).padStart(2, '0');
-  const endTimeStr = `${endHoursStr}${endMinutesStr}00`;
+  const body = isEn
+    ? `Hello, ${appointment.clientName}!\n\n` +
+      `This is the official confirmation from Beeginning 4 you (${OFFICIAL_EMAIL}) for your scheduled meeting:\n\n` +
+      `📅 Date: ${dateFormatted}\n` +
+      `⏰ Time: ${appointment.time} (Brasília Time / UTC-3)\n` +
+      `⏳ Duration: 45 minutes\n` +
+      `💻 Google Meet Room: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n` +
+      `💡 Topic: ${appointment.topic || 'Business idea & digital strategy'}\n\n` +
+      `🔒 Confidentiality & Privacy Commitment:\n` +
+      `All ideas and information discussed are protected under strict commercial secrecy and data protection laws.\n\n` +
+      `Best regards,\n` +
+      `Beeginning 4 you Team\n` +
+      `${OFFICIAL_EMAIL}`
+    : `Olá, ${appointment.clientName}!\n\n` +
+      `Este é o e-mail oficial da Beeginning 4 you (${OFFICIAL_EMAIL}) confirmando o agendamento da sua reunião virtual:\n\n` +
+      `📅 Data: ${dateFormatted}\n` +
+      `⏰ Horário: ${appointment.time} (Horário de Brasília)\n` +
+      `⏳ Duração: 45 minutos\n` +
+      `💻 Sala Virtual Google Meet: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n` +
+      `💡 Assunto: ${appointment.topic || 'Conversa inicial sobre ideia de negócio'}\n\n` +
+      `🔒 Compromisso de Sigilo e LGPD:\n` +
+      `A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018).\n\n` +
+      `Atenciosamente,\n` +
+      `Equipe Beeginning 4 you\n` +
+      `${OFFICIAL_EMAIL}`;
 
-  const description = [
-    `Reuniao Beeginning 4 You: Diagnostico e Ideia de Negocio`,
-    `Cliente: ${appointment.clientName}`,
-    `Assunto: ${appointment.topic || 'Ideia de Negocio'}`,
-    `Sala Google Meet: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}`,
-    `Termo de Sigilo e LGPD: A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negocio e informacoes compartilhadas, com protecao de dados conforme a LGPD.`
-  ].join('\\n');
+  const htmlBody = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1A1A1A; max-width: 600px; margin: 0 auto; border: 1px solid #EAE6DF; border-radius: 12px; overflow: hidden;">
+      <div style="background-color: #1E3A47; padding: 24px; color: #FFFFFF; text-align: center;">
+        <h2 style="margin: 0; font-size: 20px;">Bee-ginning 4 you</h2>
+        <p style="margin: 6px 0 0; font-size: 13px; color: #E5A93B;">${isEn ? 'Meeting Confirmed' : 'Reunião Confirmada com Sucesso'}</p>
+      </div>
+      <div style="padding: 24px; background-color: #FFFFFF;">
+        <p style="font-size: 15px;">${isEn ? `Hello, <strong>${appointment.clientName}</strong>!` : `Olá, <strong>${appointment.clientName}</strong>!`}</p>
+        <p style="font-size: 13px; color: #555555;">${isEn ? 'Your face-to-face video session is confirmed:' : 'Sua reunião virtual com nossa equipe está confirmada:'}</p>
+        <div style="background-color: #F8F8F6; border-left: 4px solid #E5A93B; padding: 14px 18px; margin: 18px 0; border-radius: 4px;">
+          <p style="margin: 4px 0; font-size: 14px;"><strong>📅 ${isEn ? 'Date:' : 'Data:'}</strong> ${dateFormatted}</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>⏰ ${isEn ? 'Time:' : 'Horário:'}</strong> ${appointment.time} (${isEn ? 'Brasília Time / UTC-3' : 'Horário de Brasília'})</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>⏳ ${isEn ? 'Duration:' : 'Duração:'}</strong> 45 min</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>💻 ${isEn ? 'Room:' : 'Sala Google Meet:'}</strong> <a href="${appointment.meetLink || FIXED_GOOGLE_MEET_URL}" style="color: #1E3A47; font-weight: bold;">${appointment.meetLink || FIXED_GOOGLE_MEET_URL}</a></p>
+        </div>
+        <p style="font-size: 12px; color: #666666; background-color: #FAFAFA; padding: 12px; border-radius: 8px; border: 1px solid #EAEAEA;">
+          🔒 <strong>${isEn ? 'Confidentiality & Privacy:' : 'Compromisso de Sigilo e LGPD:'}</strong><br/>
+          ${isEn ? 'All ideas discussed are protected under strict commercial secrecy.' : 'Garantimos sigilo absoluto sobre todas as ideias e informações compartilhadas.'}
+        </p>
+        <p style="font-size: 13px; margin-top: 20px;">
+          ${isEn ? 'Looking forward to meeting with you!' : 'Aguardamos o nosso encontro!'}<br/>
+          <strong>Equipe Bee-ginning 4 you</strong><br/>
+          <a href="mailto:${OFFICIAL_EMAIL}" style="color: #1E3A47;">${OFFICIAL_EMAIL}</a>
+        </p>
+      </div>
+    </div>
+  `;
 
-  const icsContent = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Beeginning 4 You//Agendamento de Reuniao//PT',
-    'CALSCALE:GREGORIAN',
-    'METHOD:REQUEST',
-    'BEGIN:VEVENT',
-    `UID:beeginning-${appointment.id}@beeginning4you.com.br`,
-    `DTSTAMP:${cleanDate}T000000Z`,
-    `DTSTART;TZID=America/Sao_Paulo:${cleanDate}T${startTimeStr}`,
-    `DTEND;TZID=America/Sao_Paulo:${cleanDate}T${endTimeStr}`,
-    `SUMMARY:Reunião Beeginning 4 You - ${appointment.clientName}`,
-    `DESCRIPTION:${description}`,
-    `LOCATION:${appointment.meetLink || FIXED_GOOGLE_MEET_URL}`,
-    `STATUS:${appointment.status === 'cancelled' ? 'CANCELLED' : 'CONFIRMED'}`,
-    `ORGANIZER;CN=Beeginning 4 You:MAILTO:${OFFICIAL_EMAIL}`,
-    `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=${appointment.clientName}:MAILTO:${appointment.clientEmail}`,
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].join('\r\n');
-
-  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', `reuniao-beeginning-${appointment.date}.ics`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  try {
+    const config = getContactConfig();
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: appointment.clientEmail,
+        subject,
+        text: body,
+        html: htmlBody,
+        appPassword: config.gmailAppPassword || undefined
+      })
+    });
+    const data = await res.json();
+    return { success: !!data?.success, message: data?.message || data?.error };
+  } catch (err: any) {
+    console.warn('[Email Dispatch] Falha ao acionar /api/send-email', err);
+    return { success: false, message: err?.message };
+  }
 }
 
 /**
- * Returns the upcoming 14 business days (skips weekends)
+ * Dispatches official rescheduling email from beeginning4you@gmail.com to client via server API
+ */
+export async function sendOfficialRescheduleEmail(
+  appointment: MeetingAppointment,
+  prevDate?: string,
+  prevTime?: string,
+  isEn = false
+): Promise<{ success: boolean; message?: string }> {
+  const newDateFormatted = appointment.date.split('-').reverse().join('/');
+  const prevDateFormatted = prevDate ? prevDate.split('-').reverse().join('/') : '';
+  
+  const subject = isEn
+    ? `Meeting Rescheduled: Beeginning 4 you (New time: ${newDateFormatted} at ${appointment.time})`
+    : `Reagendamento de Reunião: Beeginning 4 you (Novo horário: ${newDateFormatted} às ${appointment.time})`;
+  
+  const body = isEn
+    ? `Hello, ${appointment.clientName}!\n\n` +
+      `Your meeting with Beeginning 4 you (${OFFICIAL_EMAIL}) has been successfully rescheduled:\n\n` +
+      (prevDateFormatted ? `Previous time: ${prevDateFormatted} at ${prevTime}\n` : '') +
+      `📅 NEW DATE: ${newDateFormatted}\n` +
+      `⏰ NEW TIME: ${appointment.time} (Brasília Time / UTC-3)\n` +
+      `⏳ Duration: 45 minutes\n` +
+      `💻 Google Meet Room: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
+      `🔒 Confidentiality & Privacy Commitment:\n` +
+      `Your ideas and project information continue to be protected under absolute confidentiality and privacy terms.\n\n` +
+      `Best regards,\n` +
+      `Beeginning 4 you Team\n` +
+      `${OFFICIAL_EMAIL}`
+    : `Olá, ${appointment.clientName}!\n\n` +
+      `Confirmamos que a sua reunião com a Beeginning 4 you (${OFFICIAL_EMAIL}) foi reagendada com sucesso:\n\n` +
+      (prevDateFormatted ? `Horário anterior: ${prevDateFormatted} às ${prevTime}\n` : '') +
+      `📅 NOVA DATA: ${newDateFormatted}\n` +
+      `⏰ NOVO HORÁRIO: ${appointment.time} (Horário de Brasília)\n` +
+      `⏳ Duração: 45 minutos\n` +
+      `💻 Sala Virtual Google Meet: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
+      `🔒 Compromisso de Sigilo e LGPD:\n` +
+      `Todas as informações e ideias compartilhadas permanecem sob absoluto sigilo comercial e em conformidade com a LGPD (Lei 13.709/2018).\n\n` +
+      `Atenciosamente,\n` +
+      `Equipe Beeginning 4 you\n` +
+      `${OFFICIAL_EMAIL}`;
+
+  try {
+    const config = getContactConfig();
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: appointment.clientEmail,
+        subject,
+        text: body,
+        appPassword: config.gmailAppPassword || undefined
+      })
+    });
+    const data = await res.json();
+    return { success: !!data?.success, message: data?.message || data?.error };
+  } catch (err: any) {
+    console.warn('[Email Dispatch] Falha no backend /api/send-email', err);
+    return { success: false, message: err?.message };
+  }
+}
+
+/**
+ * Dispatches official cancellation email from beeginning4you@gmail.com to client via server API
+ */
+export async function sendOfficialCancellationEmail(
+  appointment: MeetingAppointment,
+  isEn = false
+): Promise<{ success: boolean; message?: string }> {
+  const dateFormatted = appointment.date.split('-').reverse().join('/');
+  const subject = isEn
+    ? `Meeting Cancellation: Beeginning 4 you (${dateFormatted} at ${appointment.time})`
+    : `Cancelamento de Reunião: Beeginning 4 you (${dateFormatted} às ${appointment.time})`;
+  const body = isEn
+    ? `Hello, ${appointment.clientName}!\n\n` +
+      `This is a confirmation from Beeginning 4 you (${OFFICIAL_EMAIL}) that your meeting previously scheduled for ${dateFormatted} at ${appointment.time} has been cancelled.\n\n` +
+      `If you wish to reschedule or talk to us at a more convenient time, please feel free to book a new slot on our website or reach out via WhatsApp (${OFFICIAL_WHATSAPP}).\n\n` +
+      `Best regards,\n` +
+      `Beeginning 4 you Team\n` +
+      `${OFFICIAL_EMAIL}`
+    : `Olá, ${appointment.clientName}!\n\n` +
+      `Confirmamos que a sua reunião com a equipe da Beeginning 4 you (${OFFICIAL_EMAIL}), anteriormente agendada para ${dateFormatted} às ${appointment.time}, foi cancelada conforme solicitado.\n\n` +
+      `Caso queira reagendar no futuro ou prefira conversar via WhatsApp (${OFFICIAL_WHATSAPP}), estamos sempre à sua disposição.\n\n` +
+      `Atenciosamente,\n` +
+      `Equipe Beeginning 4 you\n` +
+      `${OFFICIAL_EMAIL}`;
+
+  try {
+    const config = getContactConfig();
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: appointment.clientEmail,
+        subject,
+        text: body,
+        appPassword: config.gmailAppPassword || undefined
+      })
+    });
+    const data = await res.json();
+    return { success: !!data?.success, message: data?.message || data?.error };
+  } catch (err: any) {
+    console.warn('[Email Dispatch] Falha no backend /api/send-email', err);
+    return { success: false, message: err?.message };
+  }
+}
+
+/**
+ * Generates WhatsApp URL for the CLIENT to contact REGINA (Beeginning 4 you)
+ */
+export function getWhatsAppUrlClientToRegina(appointment: MeetingAppointment, isEn = false): string {
+  const dateFormatted = appointment.date.split('-').reverse().join('/');
+  const text = encodeURIComponent(
+    isEn
+      ? `Hello Regina! I have just scheduled a meeting on the Beeginning 4 you website.\n\n` +
+        `👤 *My Name:* ${appointment.clientName}\n` +
+        `📅 *Date:* ${dateFormatted} at ${appointment.time} (BRT)\n` +
+        `💻 *Meet Link:* ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n` +
+        `Looking forward to talking with you!`
+      : `Olá Regina! Acabei de agendar uma reunião pelo site da Beeginning 4 you.\n\n` +
+        `👤 *Meu Nome:* ${appointment.clientName}\n` +
+        `📅 *Data:* ${dateFormatted} às ${appointment.time}\n` +
+        `💻 *Sala Google Meet:* ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
+        `Fico no aguardo do nosso encontro!`
+  );
+  return `https://wa.me/${OFFICIAL_WHATSAPP}?text=${text}`;
+}
+
+/**
+ * Generates WhatsApp URL for REGINA to send confirmation to the CLIENT
+ */
+export function getWhatsAppUrlReginaToClient(appointment: MeetingAppointment, isEn = false): string {
+  const cleanPhone = (appointment.clientPhone || '').replace(/\D/g, '');
+  const phoneTarget = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  const dateFormatted = appointment.date.split('-').reverse().join('/');
+  
+  const text = encodeURIComponent(
+    isEn
+      ? `Hello, ${appointment.clientName}! Here is Regina from *Beeginning 4 you*.\n\n` +
+        `We confirm your scheduled meeting:\n` +
+        `📅 *Date:* ${dateFormatted} at ${appointment.time} (BRT)\n` +
+        `⏳ *Duration:* 45 minutes\n` +
+        `💻 *Google Meet:* ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
+        `🔒 Absolute confidentiality guaranteed under privacy terms.\n` +
+        `See you then!`
+      : `Olá, ${appointment.clientName}! Aqui é a Regina da *Beeginning 4 you*.\n\n` +
+        `Confirmamos a sua reunião virtual:\n` +
+        `📅 *Data:* ${dateFormatted} às ${appointment.time} (Horário de Brasília)\n` +
+        `⏳ *Duração:* 45 minutos\n` +
+        `💻 *Sala Google Meet:* ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
+        `🔒 Todas as informações compartilhadas estão protegidas sob sigilo e LGPD.\n` +
+        `Até logo!`
+  );
+  
+  return `https://wa.me/${phoneTarget}?text=${text}`;
+}
+
+/**
+ * Returns the upcoming 12 business days (skips weekends)
  */
 export function getAvailableBusinessDays(): Array<{
   dateString: string; // YYYY-MM-DD
-  dayOfWeek: string;  // seg, ter, qua, qui, sex
+  dayOfWeek: string;  // Seg, Ter, Qua, Qui, Sex
   dayNumber: number;
   monthName: string;
   isToday: boolean;
@@ -244,3 +430,4 @@ export const AVAILABLE_TIME_SLOTS = [
   '16:00',
   '17:00'
 ];
+

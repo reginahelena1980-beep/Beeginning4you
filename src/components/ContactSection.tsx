@@ -26,6 +26,7 @@ export default function ContactSection({
   prefilledNeed = '',
   prefilledSolution = '',
   onOpenMeeting,
+  onOpenWhatsApp,
   isOpenDirectly = false
 }: ContactSectionProps) {
   const { language } = useLanguage();
@@ -151,35 +152,100 @@ export default function ContactSection({
 
   return (
     <>
-      <section id="diagnostico-final" className="py-16 sm:py-24 bg-[#FFFFFF] relative scroll-mt-16 border-t border-[#EAE6DF]">
+      <section id="agendamento" className="py-16 sm:py-24 bg-[#FFFFFF] relative scroll-mt-16 border-t border-[#EAE6DF]">
+        <div id="diagnostico-final" />
         <div id="contato" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* End of Page Clean Invitation Card */}
-          <div className="max-w-3xl mx-auto text-center space-y-4">
+          {/* 7. Página Final & Agendamento */}
+          <div className="max-w-4xl mx-auto text-center space-y-5">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1E3A47]/10 text-[#1E3A47] text-xs font-bold uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-[#D99B26]" />
-              <span>{isEn ? "No-Commitment Diagnostic" : "Diagnóstico Sem Compromisso"}</span>
+              <span>{isEn ? "Final Page & Scheduling" : "Página Final & Agendamento"}</span>
             </div>
 
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-extrabold text-[#1A1A1A] tracking-tight">
-              {isEn ? "Ready to Take the Next Step for Your Business?" : "Pronto para Dar o Próximo Passo no Seu Negócio?"}
+              {isEn ? "Ready to Bring Your Idea to Life or Optimize Your Workflow?" : "Pronto para Dar o Próximo Passo no Seu Negócio?"}
             </h2>
 
-            <p className="text-sm sm:text-base text-[#555555] max-w-xl mx-auto leading-relaxed">
+            <p className="text-sm sm:text-base text-[#555555] max-w-2xl mx-auto leading-relaxed">
               {isEn
-                ? "Share your current idea or bottleneck. We assess your needs with strict confidentiality and provide tailored, practical guidance."
-                : "Compartilhe sua ideia ou desafio atual. Analisamos sua necessidade com sigilo absoluto e retornamos com uma orientação prática, humanizada e sob medida."}
+                ? "Choose how you prefer to get started: schedule a dedicated 45-minute Google Meet consultation, request a quick diagnostic, or connect directly on WhatsApp with total confidentiality."
+                : "Escolha como prefere iniciar: agende uma reunião virtual de 45 minutos no Google Meet, solicite um diagnóstico rápido ou converse diretamente pelo WhatsApp com total sigilo e acolhimento."}
             </p>
 
-            <div className="pt-3 flex justify-center">
-              <button
-                id="btn-pedir-diagnostico-rapido"
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="inline-flex items-center gap-2 px-8 py-3.5 sm:py-4 rounded-xl sm:rounded-2xl bg-[#E5A93B] hover:bg-[#D99B26] active:scale-98 text-[#1A1A1A] text-sm sm:text-base font-bold shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
+            {/* Core Action Cards */}
+            <div className="pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left max-w-3xl mx-auto">
+              {/* Option 1: Agendamento Google Meet */}
+              <div
+                onClick={onOpenMeeting}
+                className="p-5 rounded-2xl border-2 border-[#E5E5E2] hover:border-[#D99B26] bg-[#FDFCFB] hover:bg-white transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md flex flex-col justify-between group"
               >
-                <span>{isEn ? "Request Quick Diagnostic" : "Pedir Diagnóstico Rápido"}</span>
-                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-              </button>
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Video className="w-5 h-5 text-[#D99B26]" />
+                  </div>
+                  <h4 className="text-sm font-bold text-[#1A1A1A] group-hover:text-[#8F6413] transition-colors">
+                    {isEn ? "Schedule on Google Meet" : "Agendar Google Meet"}
+                  </h4>
+                  <p className="text-xs text-[#666666] leading-relaxed">
+                    {isEn ? "45 min video call with calendar sync." : "Encontro virtual de 45 min com sala dedicada."}
+                  </p>
+                </div>
+                <div className="mt-4 pt-2.5 border-t border-[#EAEAE7] flex items-center justify-between text-xs font-bold text-[#8F6413]">
+                  <span>{isEn ? "Book slot" : "Escolher horário"}</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+
+              {/* Option 2: Pedir Diagnóstico Rápido */}
+              <div
+                id="btn-pedir-diagnostico-card"
+                onClick={() => setIsModalOpen(true)}
+                className="p-5 rounded-2xl border-2 border-[#E5A93B] bg-[#FFFDF7] hover:bg-white transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md flex flex-col justify-between group"
+              >
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-[#E5A93B] text-[#1A1A1A] flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Sparkles className="w-5 h-5 text-[#1A1A1A]" />
+                  </div>
+                  <h4 className="text-sm font-bold text-[#1A1A1A] group-hover:text-[#D99B26] transition-colors">
+                    {isEn ? "Quick Diagnostic" : "Pedir Diagnóstico"}
+                  </h4>
+                  <p className="text-xs text-[#666666] leading-relaxed">
+                    {isEn ? "Tell us your biggest challenge in 1 minute." : "Conte sua maior dor em 1 min para receber a indicação ideal."}
+                  </p>
+                </div>
+                <div className="mt-4 pt-2.5 border-t border-[#EAEAE7] flex items-center justify-between text-xs font-bold text-[#D99B26]">
+                  <span>{isEn ? "Start now" : "Preencher formulário"}</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+
+              {/* Option 3: WhatsApp Direto */}
+              <div
+                onClick={onOpenWhatsApp}
+                className="p-5 rounded-2xl border-2 border-[#E5E5E2] hover:border-[#25D366] bg-[#FDFCFB] hover:bg-white transition-all duration-200 cursor-pointer shadow-xs hover:shadow-md flex flex-col justify-between group"
+              >
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-xl bg-[#25D366]/15 text-[#136C35] flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <MessageSquare className="w-5 h-5 text-[#1EBE5D]" />
+                  </div>
+                  <h4 className="text-sm font-bold text-[#1A1A1A] group-hover:text-[#136C35] transition-colors">
+                    {isEn ? "Direct WhatsApp" : "Falar no WhatsApp"}
+                  </h4>
+                  <p className="text-xs text-[#666666] leading-relaxed">
+                    {isEn ? "Direct real-time chat with Regina." : "Converse em tempo real sem intermediários."}
+                  </p>
+                </div>
+                <div className="mt-4 pt-2.5 border-t border-[#EAEAE7] flex items-center justify-between text-xs font-bold text-[#136C35]">
+                  <span>{isEn ? "Send message" : "Iniciar conversa"}</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </div>
+
+            {/* Confidentiality seal */}
+            <div className="pt-2 flex items-center justify-center gap-2 text-xs text-[#666666]">
+              <ShieldCheck className="w-4 h-4 text-[#D99B26]" />
+              <span>{isEn ? "Strict confidentiality and personal data protection guaranteed (LGPD)" : "Sigilo absoluto garantido e proteção de dados segundo a LGPD (Lei nº 13.709/2018)"}</span>
             </div>
           </div>
         </div>

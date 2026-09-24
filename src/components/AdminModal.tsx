@@ -29,7 +29,8 @@ import {
   Camera,
   RotateCcw,
   Image as ImageIcon,
-  Loader2
+  Loader2,
+  Key
 } from 'lucide-react';
 import reginaDefaultPhoto from '../assets/images/regina_portrait_1790082408093.jpg';
 import { MeetingAppointment, DemandForm, ContactConfig, MeetingDiagnosticData } from '../types';
@@ -99,6 +100,11 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [configForm, setConfigForm] = useState<ContactConfig>(config);
   const [configSavedNotice, setConfigSavedNotice] = useState<string>('');
   const [notesSavedNotice, setNotesSavedNotice] = useState<string>('');
+
+  // Email and Server automation state
+  const [showGmailPassword, setShowGmailPassword] = useState<boolean>(false);
+  const [isTestingEmail, setIsTestingEmail] = useState<boolean>(false);
+  const [testEmailResult, setTestEmailResult] = useState<{ success: boolean; message: string } | null>(null);
 
   // Photo management state
   const [isUploadingPhoto, setIsUploadingPhoto] = useState<boolean>(false);
@@ -182,12 +188,54 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     setLoginError('');
   };
 
-  const handleSaveConfig = (e: React.FormEvent) => {
+  const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
     saveContactConfig(configForm);
     setConfig(configForm);
-    setConfigSavedNotice('Configurações de contato atualizadas com sucesso!');
+
+    try {
+      await fetch('/api/admin/save-server-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gmailAppPassword: configForm.gmailAppPassword,
+          whatsappGatewayUrl: configForm.whatsappGatewayUrl,
+          whatsappGatewayToken: configForm.whatsappGatewayToken
+        })
+      });
+    } catch (err) {
+      console.warn('Could not sync with server config', err);
+    }
+
+    setConfigSavedNotice('Configurações salvas e sincronizadas com o servidor com sucesso!');
     setTimeout(() => setConfigSavedNotice(''), 3500);
+  };
+
+  const handleTestEmail = async () => {
+    setIsTestingEmail(true);
+    setTestEmailResult(null);
+    try {
+      const res = await fetch('/api/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: configForm.email || 'beeginning4you@gmail.com',
+          appPassword: configForm.gmailAppPassword
+        })
+      });
+      const data = await res.json();
+      setTestEmailResult({
+        success: !!data.success,
+        message: data.message || data.error || (data.success ? 'E-mail enviado com sucesso!' : 'Falha no teste')
+      });
+    } catch (err: any) {
+      setTestEmailResult({
+        success: false,
+        message: err?.message || 'Erro ao conectar ao servidor.'
+      });
+    } finally {
+      setIsTestingEmail(false);
+    }
   };
 
   const handleImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -791,14 +839,22 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
                             <a
                               href={`https://wa.me/${selectedMeeting.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                `Olá ${selectedMeeting.clientName}! Tudo bem? Sou da Beeginning 4 you sobre a nossa reunião agendada para ${selectedMeeting.date.split('-').reverse().join('/')} às ${selectedMeeting.time}. Link da sala: ${selectedMeeting.meetLink || config.meetUrl}`
+                                `Olá, *${selectedMeeting.clientName}*! Aqui é a Regina da *Bee-ginning 4 you*.\n\n` +
+                                `Confirmamos o agendamento da sua reunião virtual conosco:\n\n` +
+                                `📅 *Data:* ${selectedMeeting.date.split('-').reverse().join('/')}\n` +
+                                `⏰ *Horário:* ${selectedMeeting.time} (Horário de Brasília)\n` +
+                                `⏳ *Duração:* 45 minutos\n` +
+                                `💻 *Sala Google Meet:* ${selectedMeeting.meetLink || config.meetUrl}\n\n` +
+                                `🔒 Garantimos sigilo absoluto sobre todas as suas ideias e conformidade com a LGPD.\n\n` +
+                                `Qualquer dúvida estou à disposição por aqui. Até logo!`
                               )}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-1.5 p-2 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#136C35] font-semibold"
+                              className="inline-flex items-center justify-center gap-1.5 p-2 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#136C35] font-bold"
+                              title="Abre o seu WhatsApp com mensagem oficial pronta para enviar para o cliente"
                             >
                               <Phone className="w-3.5 h-3.5" />
-                              <span>Falar no WhatsApp</span>
+                              <span>Disparar WhatsApp ao Cliente</span>
                             </a>
 
                             <a

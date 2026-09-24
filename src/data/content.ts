@@ -87,7 +87,7 @@ export const REAL_PROJECT_EXAMPLES: RealProjectExample[] = [
   },
   {
     id: 'desenvolvimento-desta-pagina',
-    title: 'Desenvolvimento de Plataforma We',
+    title: 'Desenvolvimento de Plataforma Web',
     badge: 'Projeto Real • Plataforma Autoral',
     tagline: 'Arquitetura digital refinada, agendamento de reuniões, compromisso LGPD e banco de demandas',
     iconName: 'Globe',

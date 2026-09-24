@@ -24,6 +24,9 @@ export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
   adminPassword: 'bee2026',
   adminPasswordHash: 'bee2026',
   profilePhotoUrl: '',
+  gmailAppPassword: '',
+  whatsappGatewayUrl: '',
+  whatsappGatewayToken: '',
 };
 
 const CONFIG_STORAGE_KEY = 'beeginning_contact_config_v1';

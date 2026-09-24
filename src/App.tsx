@@ -25,7 +25,7 @@ export default function App() {
 
   const handleSelectSolutionForContact = (solutionTitle: string) => {
     setPrefilledSolution(solutionTitle);
-    const diagnosticEl = document.querySelector('#diagnostico-final');
+    const diagnosticEl = document.querySelector('#agendamento') || document.querySelector('#diagnostico-final');
     if (diagnosticEl) {
       diagnosticEl.scrollIntoView({ behavior: 'smooth' });
     }
@@ -38,30 +38,33 @@ export default function App() {
         onOpenConversation={() => handleOpenConversation('hub')}
       />
 
-      {/* Main Page Flow */}
+      {/* Main Page Flow: Strictly the 8 Defined Sections */}
       <main className="flex-1">
-        {/* 1. Hero Section */}
-        <Hero onOpenDiagnostic={() => {
-          const el = document.querySelector('#diagnostico-final');
-          el?.scrollIntoView({ behavior: 'smooth' });
-        }} />
+        {/* 1. Início (Hero) */}
+        <Hero
+          onOpenDiagnostic={() => {
+            const el = document.querySelector('#agendamento') || document.querySelector('#diagnostico-final');
+            el?.scrollIntoView({ behavior: 'smooth' });
+          }}
+          onOpenConversation={() => handleOpenConversation('hub')}
+        />
 
-        {/* 2. Quem Somos: O Conceito e o Símbolo do Infinito */}
+        {/* 2. Quem Somos: Citação, Perfil da Regina e 6 Competências */}
         <AboutUs onOpenConversation={() => handleOpenConversation('hub')} />
 
-        {/* 3. Philosophy & Manifesto: Ideia ➔ Forma ➔ Solução */}
+        {/* 3. Filosofia & Manifesto: Ideia ➔ Forma ➔ Solução */}
         <Philosophy />
 
-        {/* 4. What We Do: Digital Solutions for Small Businesses */}
+        {/* 4. O Que Fazemos: Soluções Digitais Sob Medida */}
         <Solutions onSelectSolutionForContact={handleSelectSolutionForContact} />
 
-        {/* 5. Target Audience: Para Quem é? */}
+        {/* 5. Para Quem: Perfis de Negócios e Desafios Reais */}
         <TargetAudience />
 
-        {/* 6. Real Stories / Use Cases (Projetos Reais) */}
+        {/* 6. Projetos Reais: Histórias e Casos Práticos */}
         <UseCases onSelectSolutionForContact={handleSelectSolutionForContact} />
 
-        {/* 7. End of page: Pedir Diagnóstico Rápido & Contact Section */}
+        {/* 7. Página Final & Agendamento: Agendamento Google Meet, Diagnóstico e WhatsApp */}
         <ContactSection
           prefilledNeed={prefilledNeed}
           prefilledSolution={prefilledSolution}
@@ -70,20 +73,20 @@ export default function App() {
         />
       </main>
 
-      {/* 8. Footer with Password-Protected Admin Access via © 2026 */}
+      {/* 8. Footer with Password-Protected Admin Access (Painel Administrativo & Configurações) */}
       <Footer
         onOpenConversation={() => handleOpenConversation('hub')}
         onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
-      {/* Interactive Conversation & Scheduling Modal */}
+      {/* Interactive Conversation & Scheduling Modal (with autonomous reschedule/cancel & email automation) */}
       <ConversationModal
         isOpen={isConversationOpen}
         onClose={() => setIsConversationOpen(false)}
         initialTab={conversationInitialTab}
       />
 
-      {/* Password-Protected Administrative Dashboard */}
+      {/* 8. Painel Administrativo (ADM) e Configurações */}
       <AdminModal
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}

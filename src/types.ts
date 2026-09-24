@@ -148,4 +148,7 @@ export interface ContactConfig {
   adminPassword?: string;
   adminPasswordHash: string; // Simple password comparison
   profilePhotoUrl?: string; // Custom profile photo for Regina
+  gmailAppPassword?: string; // Senha de Aplicativo do Gmail (16 caracteres) para disparo automático
+  whatsappGatewayUrl?: string; // URL do Gateway de WhatsApp para disparo direto (opcional)
+  whatsappGatewayToken?: string; // Token do Gateway de WhatsApp (opcional)
 }

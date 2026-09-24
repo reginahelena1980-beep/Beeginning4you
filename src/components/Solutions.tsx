@@ -53,7 +53,7 @@ export default function Solutions({ onSelectSolutionForContact }: SolutionsProps
 
   return (
     <section id="solucoes" className="py-20 sm:py-28 bg-[#F9F9F8] relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16 sm:space-y-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 sm:space-y-16">
         
         {/* Section Header & Humanized Summary */}
         <div className="max-w-3xl mx-auto text-center space-y-4">
@@ -68,146 +68,55 @@ export default function Solutions({ onSelectSolutionForContact }: SolutionsProps
 
           <p className="text-base sm:text-lg text-[#4A4A48] leading-relaxed">
             {isEn
-              ? "We engineer the missing piece for your business machinery to run effortlessly so you can focus on what you do best. We create agile, pragmatic digital solutions free from heavyweight platforms and hidden costs."
-              : "Desenvolvemos a peça que falta para a engrenagem do seu negócio rodar macia e você focar no que faz de melhor. Criamos soluções digitais leves, práticas e livres da complexidade de plataformas pesadas e custos surpresa."}
+              ? "We develop the missing piece for your business to run smoothly and for you to focus on what you do best. We create lightweight, practical digital solutions free from the complexity of heavy platforms and surprise costs."
+              : "Desenvolvemos a peça que falta para o seu negócio rodar e você focar no que faz de melhor. Criamos soluções digitais leves, práticas e livres da complexidade de plataformas pesadas e custos surpresa."}
           </p>
         </div>
 
-        {/* Highlight Banner: Lean Philosophy & No-Bloat Commitment */}
-        <div className="bg-white rounded-2xl border border-[#E8E8E5] p-6 sm:p-9 shadow-xs">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center mb-3">
-                <Workflow className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-[#1A1A1A]">
-                {isEn ? "Smooth Machinery" : "Engrenagem Macia"}
-              </h3>
-              <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
-                {isEn
-                  ? "Great technology shapes itself to your working rhythm — never the opposite. We map every flow to eliminate friction and restore your valuable time."
-                  : "Tecnologia boa é a que se molda ao seu ritmo de trabalho — e não o contrário. Desenhamos cada fluxo para eliminar gargalos e devolver seu tempo."}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-[#1E3A47]/10 text-[#1E3A47] flex items-center justify-center mb-3">
-                <Zap className="w-5 h-5 text-[#D99B26]" />
-              </div>
-              <h3 className="text-base font-bold text-[#1A1A1A]">
-                {isEn ? "Zero Software Bloat" : "Zero Sistemas Inchados"}
-              </h3>
-              <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
-                {isEn
-                  ? "No crowded screens with 80 confusing buttons where you only ever touch three. We build solely what creates tangible return for your bottom line."
-                  : "Nada de telas poluídas com 80 botões dos quais você só usa três. Construímos apenas o essencial que gera resultado concreto para o seu caixa."}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="w-10 h-10 rounded-xl bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center mb-3">
-                <CheckCircle2 className="w-5 h-5 text-[#D99B26]" />
-              </div>
-              <h3 className="text-base font-bold text-[#1A1A1A]">
-                {isEn ? "Focus On Your Strengths" : "Foco no Que Faz de Melhor"}
-              </h3>
-              <p className="text-xs sm:text-sm text-[#555555] leading-relaxed">
-                {isEn
-                  ? "Less time wasted on duplicated messages, lost notes, or tangled spreadsheets. You serve your clients, and the machinery hums along."
-                  : "Menos tempo perdido com mensagens duplicadas, anotações perdidas ou planilhas confusas. Você atende seus clientes, e a engrenagem roda suave."}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Modular Solutions Catalog */}
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#E8E8E5] pb-4">
-            <div className="max-w-2xl">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#1E3A47] block mb-1">
-                {isEn ? "Digital Services Catalog" : "Catálogo de Serviços Digitais"}
-              </span>
-              <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-[#1A1A1A]">
-                {isEn ? "Tools Built for Your Day-to-Day" : "Ferramentas Feitas para o Seu Dia a Dia"}
-              </h3>
-              <p className="text-xs sm:text-sm text-[#555555] mt-1.5">
-                {isEn
-                  ? "From complete online shops to focused integrations and automations, pick the optimal module for your routine:"
-                  : "De lojas virtuais completas a integrações e automações pontuais, escolha o módulo ideal para a sua rotina:"}
-              </p>
-            </div>
-
-            <a
-              href="#historias"
-              onClick={(e) => {
-                e.preventDefault();
-                const el = document.querySelector('#historias');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
-              }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#1E3A47] hover:text-[#D99B26] transition-colors whitespace-nowrap self-start sm:self-end"
+        {/* 6 Modular Solutions Cards Grid (Screenshot 6) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+          {solutionsList.map((item) => (
+            <div
+              key={item.id}
+              id={`solution-card-${item.id}`}
+              className="group bg-white rounded-2xl border border-[#E8E8E5] hover:border-[#D99B26] p-7 flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300"
             >
-              <span>{isEn ? "See real projects built" : "Ver projetos reais desenvolvidos"}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            {solutionsList.map((item) => (
-              <div
-                key={item.id}
-                id={`solution-card-${item.id}`}
-                className="group bg-white rounded-2xl border border-[#E8E8E5] hover:border-[#D99B26] p-7 flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300"
-              >
-                <div>
-                  {/* Top Badge & Icon */}
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="w-12 h-12 rounded-xl bg-[#F4F4F2] group-hover:bg-[#E5A93B]/20 text-[#1E3A47] group-hover:text-[#8F6413] flex items-center justify-center transition-colors">
-                      {renderIcon(item.iconName)}
-                    </div>
-
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#1E3A47]/8 text-[#1E3A47] group-hover:bg-[#E5A93B]/20 group-hover:text-[#8F6413] transition-colors whitespace-nowrap">
-                      {item.badge}
-                    </span>
+              <div>
+                {/* Top Badge & Icon */}
+                <div className="flex items-center justify-between mb-5">
+                  <div className="w-12 h-12 rounded-xl bg-[#F4F4F2] group-hover:bg-[#E5A93B]/20 text-[#1E3A47] group-hover:text-[#8F6413] flex items-center justify-center transition-colors">
+                    {renderIcon(item.iconName)}
                   </div>
 
-                  {/* Title & Description */}
-                  <h4 className="text-lg sm:text-xl font-bold font-display text-[#1A1A1A] group-hover:text-[#1E3A47] transition-colors mb-2.5">
-                    {item.title}
-                  </h4>
-
-                  <p className="text-xs sm:text-sm text-[#555555] leading-relaxed mb-5">
-                    {item.shortDesc}
-                  </p>
-
-                  {/* Practical Features checklist preview */}
-                  <div className="space-y-2 border-t border-[#F0F0EE] pt-4 mb-5">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#888888] block">
-                      {isEn ? "Practical benefits:" : "Benefícios práticos:"}
-                    </span>
-                    {item.features.slice(0, 3).map((feature, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-xs text-[#333333]">
-                        <Check className="w-3.5 h-3.5 text-[#D99B26] shrink-0" />
-                        <span>{feature}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#1E3A47]/8 text-[#1E3A47] group-hover:bg-[#E5A93B]/20 group-hover:text-[#8F6413] transition-colors whitespace-nowrap">
+                    {item.badge}
+                  </span>
                 </div>
 
-                {/* Bottom Action Area */}
-                <div className="pt-3.5 border-t border-[#F0F0EE] flex items-center justify-between">
-                  <button
-                    type="button"
-                    id={`btn-details-${item.id}`}
-                    onClick={() => setActiveModalSolution(item)}
-                    className="text-xs font-bold text-[#1E3A47] hover:text-[#D99B26] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <HelpCircle className="w-3.5 h-3.5 text-[#D99B26]" />
-                    <span>{t.detailsBtn}</span>
-                  </button>
-                </div>
+                {/* Title & Description */}
+                <h3 className="text-lg sm:text-xl font-bold font-display text-[#1A1A1A] group-hover:text-[#1E3A47] transition-colors mb-3 leading-snug">
+                  {item.title}
+                </h3>
+
+                <p className="text-xs sm:text-sm text-[#555555] leading-relaxed mb-6">
+                  {item.shortDesc}
+                </p>
               </div>
-            ))}
-          </div>
+
+              {/* Bottom Action Area */}
+              <div className="pt-4 border-t border-[#F0F0EE] flex items-center justify-between">
+                <button
+                  type="button"
+                  id={`btn-details-${item.id}`}
+                  onClick={() => setActiveModalSolution(item)}
+                  className="text-xs font-bold text-[#1E3A47] hover:text-[#D99B26] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-[#D99B26]" />
+                  <span>{t.detailsBtn}</span>
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
 
       </div>

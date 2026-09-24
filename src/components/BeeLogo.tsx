@@ -268,3 +268,121 @@ export default function BeeLogo({
     </div>
   );
 }
+
+interface InfinityBeeIconProps {
+  className?: string;
+  color?: string;
+  strokeWidth?: number;
+  withTrail?: boolean;
+}
+
+export function InfinityBeeIcon({
+  className = 'w-6 h-6',
+  color = 'currentColor',
+  strokeWidth = 2.4,
+  withTrail = false,
+}: InfinityBeeIconProps) {
+  if (withTrail) {
+    return (
+      <svg
+        viewBox="0 0 54 40"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        className={className}
+        aria-hidden="true"
+      >
+        {/* Continuous flight wave entering the bee */}
+        <path
+          d="M 4 33 C 12 33, 20 27, 27 28 C 32 29, 36 21, 38 16"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <g transform="translate(38, 16) rotate(12)">
+          {/* Central body stem */}
+          <path
+            d="M 0,4.8 L 0,-4.8"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+          />
+          {/* Horizontal Infinity Wings */}
+          <path
+            d="M 0,0 C -3.5,-6 -11.5,-6 -11.5,0 C -11.5,6 -3.5,6 0,0 C 3.5,-6 11.5,-6 11.5,0 C 11.5,6 3.5,6 0,0 Z"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Left antenna with bead */}
+          <path
+            d="M 0,-4.8 C -1.2,-7.5 -2.8,-10 -4.2,-12"
+            stroke={color}
+            strokeWidth={strokeWidth * 0.75}
+            fill="none"
+            strokeLinecap="round"
+          />
+          <circle cx="-4.2" cy="-12" r="1.5" fill={color} />
+          {/* Right antenna with bead */}
+          <path
+            d="M 0,-4.8 C 1.2,-7.5 2.8,-10 4.2,-12"
+            stroke={color}
+            strokeWidth={strokeWidth * 0.75}
+            fill="none"
+            strokeLinecap="round"
+          />
+          <circle cx="4.2" cy="-12" r="1.5" fill={color} />
+        </g>
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 38 34"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      <g transform="translate(19, 19) rotate(12)">
+        {/* Central body stem */}
+        <path
+          d="M 0,5.5 L 0,-5.5"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+        />
+        {/* Horizontal Infinity Wings */}
+        <path
+          d="M 0,0 C -4.5,-7.5 -14,-7.5 -14,0 C -14,7.5 -4.5,7.5 0,0 C 4.5,-7.5 14,-7.5 14,0 C 14,7.5 4.5,7.5 0,0 Z"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Left antenna with bead */}
+        <path
+          d="M 0,-5.5 C -1.8,-9.5 -3.8,-12 -5.5,-14.5"
+          stroke={color}
+          strokeWidth={strokeWidth * 0.75}
+          fill="none"
+          strokeLinecap="round"
+        />
+        <circle cx="-5.5" cy="-14.5" r="1.8" fill={color} />
+        {/* Right antenna with bead */}
+        <path
+          d="M 0,-5.5 C 1.8,-9.5 3.8,-12 5.5,-14.5"
+          stroke={color}
+          strokeWidth={strokeWidth * 0.75}
+          fill="none"
+          strokeLinecap="round"
+        />
+        <circle cx="5.5" cy="-14.5" r="1.8" fill={color} />
+      </g>
+    </svg>
+  );
+}

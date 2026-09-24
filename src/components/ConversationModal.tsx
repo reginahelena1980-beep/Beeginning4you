@@ -8,7 +8,6 @@ import {
   Clock,
   CheckCircle2,
   ExternalLink,
-  FileDown,
   ArrowRight,
   ChevronLeft,
   Lock,
@@ -16,7 +15,9 @@ import {
   Mail,
   Phone,
   AlertCircle,
-  Share2
+  RefreshCw,
+  XCircle,
+  Send
 } from 'lucide-react';
 import { MeetingAppointment } from '../types';
 import {
@@ -26,9 +27,16 @@ import {
 import {
   saveAppointment,
   generateGoogleCalendarUrl,
-  downloadIcsFile,
   getAvailableBusinessDays,
-  AVAILABLE_TIME_SLOTS
+  AVAILABLE_TIME_SLOTS,
+  cancelAppointmentInStorage,
+  rescheduleAppointmentInStorage,
+  sendOfficialConfirmationEmail,
+  sendOfficialRescheduleEmail,
+  sendOfficialCancellationEmail,
+  getWhatsAppUrlClientToRegina,
+  OFFICIAL_EMAIL,
+  OFFICIAL_WHATSAPP
 } from '../utils/calendar';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -67,6 +75,14 @@ export default function ConversationModal({
   const [lastBookedMeeting, setLastBookedMeeting] = useState<MeetingAppointment | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState(false);
 
+  // Autonomous Reschedule & Cancellation states
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleError, setRescheduleError] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string>('');
+
   const availableDays = getAvailableBusinessDays();
 
   // Reset and load initial on open
@@ -82,6 +98,9 @@ export default function ConversationModal({
       if (AVAILABLE_TIME_SLOTS.length > 0 && !selectedTime) {
         setSelectedTime(AVAILABLE_TIME_SLOTS[1]); // Default to 10:00
       }
+      setIsRescheduling(false);
+      setIsCancelling(false);
+      setActionNotice('');
     }
   }, [isOpen, initialTab]);
 
@@ -195,67 +214,123 @@ export default function ConversationModal({
     saveAppointment(newAppointment);
     setLastBookedMeeting(newAppointment);
     setBookingSuccess(true);
+    setActionNotice('');
+
+    // Trigger official confirmation email dispatch directly from beeginning4you@gmail.com
+    sendOfficialConfirmationEmail(newAppointment, isEn);
   };
 
-  // Helper to send appointment details to client via WhatsApp
-  const handleSendToClientWhatsApp = () => {
+  // Helper to re-send appointment confirmation to client via Official Email
+  const handleSendToClientEmail = async () => {
     if (!lastBookedMeeting) return;
-    const cleanPhone = lastBookedMeeting.clientPhone.replace(/\D/g, '');
-    const dateFormatted = lastBookedMeeting.date.split('-').reverse().join('/');
-    const message = encodeURIComponent(
-      isEn
-        ? `Hello, ${lastBookedMeeting.clientName}!\n\n` +
-          `Here is the information for your meeting with *Beeginning 4 you*:\n\n` +
-          `📅 *Date:* ${dateFormatted}\n` +
-          `⏰ *Time:* ${lastBookedMeeting.time} (BRT / UTC-3)\n` +
-          `⏳ *Duration:* 45 minutes\n` +
-          `💻 *Google Meet Link:* ${lastBookedMeeting.meetLink}\n\n` +
-          `🔒 Absolute confidentiality guaranteed under our privacy terms.\n` +
-          `Feel free to reach out with any questions!`
-        : `Olá, ${lastBookedMeeting.clientName}!\n\n` +
-          `Aqui estão as informações da sua reunião com a *Beeginning 4 you*:\n\n` +
-          `📅 *Data:* ${dateFormatted}\n` +
-          `⏰ *Horário:* ${lastBookedMeeting.time} (Horário de Brasília)\n` +
-          `⏳ *Duração:* 45 minutos\n` +
-          `💻 *Link Google Meet:* ${lastBookedMeeting.meetLink}\n\n` +
-          `🔒 Garantimos sigilo absoluto sobre suas ideias e conformidade com a LGPD.\n` +
-          `Qualquer dúvida, estamos à disposição!`
+    const res = await sendOfficialConfirmationEmail(lastBookedMeeting, isEn);
+    setActionNotice(
+      res.success
+        ? (isEn ? `Confirmation email resent to ${lastBookedMeeting.clientEmail}.` : `E-mail de confirmação reenviado para ${lastBookedMeeting.clientEmail}.`)
+        : (isEn ? `Dispatch triggered. Please verify your inbox.` : `Disparo acionado para ${lastBookedMeeting.clientEmail}.`)
     );
-    const targetUrl = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${message}` : `https://wa.me/?text=${message}`;
-    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   };
 
-  // Helper to send appointment details to client via Email
-  const handleSendToClientEmail = () => {
+  // Autonomous Rescheduling Action
+  const handleStartReschedule = () => {
     if (!lastBookedMeeting) return;
-    const dateFormatted = lastBookedMeeting.date.split('-').reverse().join('/');
-    const subject = encodeURIComponent(
+    setRescheduleDate(lastBookedMeeting.date);
+    setRescheduleTime(lastBookedMeeting.time);
+    setRescheduleError('');
+    setIsRescheduling(true);
+    setIsCancelling(false);
+  };
+
+  const handleConfirmReschedule = () => {
+    if (!lastBookedMeeting) return;
+    if (!rescheduleDate || !rescheduleTime) {
+      setRescheduleError(isEn ? 'Please choose a date and time.' : 'Por favor, selecione uma data e horário.');
+      return;
+    }
+    if (rescheduleDate === lastBookedMeeting.date && rescheduleTime === lastBookedMeeting.time) {
+      setRescheduleError(
+        isEn
+          ? 'Please select a different date or time to reschedule.'
+          : 'Por favor, selecione uma data ou horário diferente para reagendar.'
+      );
+      return;
+    }
+
+    const prevDate = lastBookedMeeting.date;
+    const prevTime = lastBookedMeeting.time;
+
+    rescheduleAppointmentInStorage(lastBookedMeeting.id, rescheduleDate, rescheduleTime);
+
+    const updated: MeetingAppointment = {
+      ...lastBookedMeeting,
+      date: rescheduleDate,
+      time: rescheduleTime,
+      status: 'rescheduled',
+      history: [
+        ...(lastBookedMeeting.history || []),
+        {
+          date: new Date().toISOString(),
+          action: `Reagendada pelo cliente para ${rescheduleDate} às ${rescheduleTime}`
+        }
+      ]
+    };
+
+    setLastBookedMeeting(updated);
+    setIsRescheduling(false);
+    setRescheduleError('');
+
+    // Dispatch official rescheduling notification email from beeginning4you@gmail.com
+    sendOfficialRescheduleEmail(updated, prevDate, prevTime, isEn);
+
+    setActionNotice(
       isEn
-        ? `Meeting Confirmation - Beeginning 4 you (${dateFormatted} at ${lastBookedMeeting.time})`
-        : `Confirmação de Reunião - Beeginning 4 you (${dateFormatted} às ${lastBookedMeeting.time})`
+        ? `Meeting rescheduled! Official update dispatched from ${OFFICIAL_EMAIL} to ${updated.clientEmail}.`
+        : `Reunião reagendada com sucesso! Notificação oficial disparada de ${OFFICIAL_EMAIL} para ${updated.clientEmail}.`
     );
-    const body = encodeURIComponent(
+  };
+
+  // Autonomous Cancellation Action
+  const handleStartCancel = () => {
+    setIsCancelling(true);
+    setIsRescheduling(false);
+  };
+
+  const handleConfirmCancel = () => {
+    if (!lastBookedMeeting) return;
+    cancelAppointmentInStorage(lastBookedMeeting.id);
+
+    const updated: MeetingAppointment = {
+      ...lastBookedMeeting,
+      status: 'cancelled',
+      history: [
+        ...(lastBookedMeeting.history || []),
+        {
+          date: new Date().toISOString(),
+          action: 'Reunião cancelada pelo cliente'
+        }
+      ]
+    };
+
+    setLastBookedMeeting(updated);
+    setIsCancelling(false);
+
+    // Dispatch official cancellation email from beeginning4you@gmail.com
+    sendOfficialCancellationEmail(updated, isEn);
+
+    setActionNotice(
       isEn
-        ? `Hello, ${lastBookedMeeting.clientName}!\n\n` +
-          `We confirm your meeting with the Beeginning 4 you team:\n\n` +
-          `Date: ${dateFormatted}\n` +
-          `Time: ${lastBookedMeeting.time} (BRT / UTC-3)\n` +
-          `Duration: 45 minutes\n` +
-          `Google Meet Virtual Room: ${lastBookedMeeting.meetLink}\n\n` +
-          `Topic: ${lastBookedMeeting.topic}\n\n` +
-          `Confidentiality & Privacy: All shared ideas are strictly protected.\n\n` +
-          `Best regards,\nBeeginning 4 you Team`
-        : `Olá, ${lastBookedMeeting.clientName}!\n\n` +
-          `Confirmamos o agendamento da sua reunião com a equipe da Beeginning 4 you:\n\n` +
-          `Data: ${dateFormatted}\n` +
-          `Horário: ${lastBookedMeeting.time} (Horário de Brasília)\n` +
-          `Duração: 45 minutos\n` +
-          `Sala Virtual Google Meet: ${lastBookedMeeting.meetLink}\n\n` +
-          `Assunto: ${lastBookedMeeting.topic}\n\n` +
-          `Compromisso de Sigilo e LGPD: Todas as informações e conceitos compartilhados estão protegidos sob sigilo comercial e a Lei Geral de Proteção de Dados (Lei 13.709/2018).\n\n` +
-          `Atenciosamente,\nEquipe Beeginning 4 you`
+        ? `Meeting cancelled. Official cancellation notice sent from ${OFFICIAL_EMAIL} to ${updated.clientEmail}.`
+        : `Reunião cancelada com sucesso. Notificação oficial enviada a partir de ${OFFICIAL_EMAIL} para ${updated.clientEmail}.`
     );
-    window.open(`mailto:${lastBookedMeeting.clientEmail}?subject=${subject}&body=${body}`, '_blank');
+  };
+
+  // Reset to schedule another meeting
+  const handleScheduleNewMeeting = () => {
+    setBookingSuccess(false);
+    setLastBookedMeeting(null);
+    setIsRescheduling(false);
+    setIsCancelling(false);
+    setActionNotice('');
   };
 
   return (
@@ -570,21 +645,52 @@ export default function ConversationModal({
           {activeTab === 'meeting' && (
             <div>
               {bookingSuccess && lastBookedMeeting ? (
-                /* Post-Booking Confirmation & Google Calendar / Direct Send Hub */
+                /* Post-Booking Confirmation & Google Calendar / Autonomous Reschedule & Cancel */
                 <div className="space-y-6 animate-fadeIn">
+                  {/* Header Status */}
                   <div className="text-center space-y-2 py-2">
-                    <div className="w-14 h-14 rounded-full bg-[#E5A93B]/20 text-[#8F6413] flex items-center justify-center mx-auto">
-                      <CheckCircle2 className="w-8 h-8 text-[#D99B26]" />
+                    <div
+                      className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto ${
+                        lastBookedMeeting.status === 'cancelled'
+                          ? 'bg-rose-100 text-rose-700'
+                          : lastBookedMeeting.status === 'rescheduled'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-[#E5A93B]/20 text-[#8F6413]'
+                      }`}
+                    >
+                      {lastBookedMeeting.status === 'cancelled' ? (
+                        <XCircle className="w-8 h-8 text-rose-600" />
+                      ) : lastBookedMeeting.status === 'rescheduled' ? (
+                        <RefreshCw className="w-7 h-7 text-amber-700" />
+                      ) : (
+                        <CheckCircle2 className="w-8 h-8 text-[#D99B26]" />
+                      )}
                     </div>
                     <h4 className="text-xl font-display font-extrabold text-[#1A1A1A]">
-                      {isEn ? "Meeting Successfully Scheduled!" : "Reunião Agendada com Sucesso!"}
+                      {lastBookedMeeting.status === 'cancelled'
+                        ? (isEn ? 'Meeting Cancelled' : 'Reunião Cancelada')
+                        : lastBookedMeeting.status === 'rescheduled'
+                        ? (isEn ? 'Meeting Successfully Rescheduled!' : 'Reunião Reagendada com Sucesso!')
+                        : (isEn ? 'Meeting Successfully Scheduled!' : 'Reunião Agendada com Sucesso!')}
                     </h4>
                     <p className="text-xs text-[#555555] max-w-md mx-auto">
-                      {isEn
-                        ? "Your face-to-face video session is confirmed. You can sync it to your Google Calendar or receive details on WhatsApp/Email."
-                        : "Seu encontro virtual face a face está confirmado. As informações foram salvas e você pode sincronizar com seu Google Calendar ou receber via WhatsApp/E-mail."}
+                      {lastBookedMeeting.status === 'cancelled'
+                        ? (isEn
+                            ? 'Your appointment has been cancelled. An official cancellation notice was sent to your email.'
+                            : 'O cancelamento foi processado com sucesso. Uma notificação oficial foi enviada para o seu e-mail.')
+                        : (isEn
+                            ? 'Your face-to-face video session is confirmed. You can sync it to your Google Calendar or manage your schedule below.'
+                            : 'Seu encontro virtual face a face está confirmado. As informações foram salvas e você pode sincronizar com seu Google Calendar ou reagendar/cancelar abaixo.')}
                     </p>
                   </div>
+
+                  {/* Feedback Action Notice Banner */}
+                  {actionNotice && (
+                    <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-center gap-2.5">
+                      <Send className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span className="font-medium">{actionNotice}</span>
+                    </div>
+                  )}
 
                   {/* Summary Box */}
                   <div className="p-5 rounded-2xl bg-[#F9F9F8] border border-[#E5E5E2] space-y-4">
@@ -593,12 +699,22 @@ export default function ConversationModal({
                         <span className="text-[10px] uppercase font-bold text-[#888888] block">
                           {isEn ? "Date & Time" : "Data & Horário"}
                         </span>
-                        <span className="text-sm font-bold text-[#1A1A1A] mt-0.5 block">
+                        <span className={`text-sm font-bold mt-0.5 block ${lastBookedMeeting.status === 'cancelled' ? 'line-through text-neutral-400' : 'text-[#1A1A1A]'}`}>
                           {lastBookedMeeting.date.split('-').reverse().join('/')} {isEn ? "at" : "às"} {lastBookedMeeting.time}
                         </span>
                         <span className="text-[11px] text-[#666666]">
-                          {isEn ? `Duration: ${lastBookedMeeting.durationMinutes} minutes` : `Duração: ${lastBookedMeeting.durationMinutes} minutos`}
+                          {isEn ? `Duration: ${lastBookedMeeting.durationMinutes} minutes (BRT)` : `Duração: ${lastBookedMeeting.durationMinutes} minutos (Horário de Brasília)`}
                         </span>
+                        {lastBookedMeeting.status === 'rescheduled' && (
+                          <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                            {isEn ? "Rescheduled" : "Horário Reagendado"}
+                          </span>
+                        )}
+                        {lastBookedMeeting.status === 'cancelled' && (
+                          <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800">
+                            {isEn ? "Cancelled" : "Cancelado"}
+                          </span>
+                        )}
                       </div>
 
                       <div className="p-3 rounded-xl bg-white border border-[#EAEAE7]">
@@ -609,87 +725,273 @@ export default function ConversationModal({
                           {lastBookedMeeting.clientName}
                         </span>
                         <span className="text-[11px] text-[#666666] truncate block">{lastBookedMeeting.clientEmail}</span>
+                        <span className="text-[11px] text-[#888888] block">{lastBookedMeeting.clientPhone}</span>
                       </div>
                     </div>
 
-                    {/* Google Meet Fixed Room Banner */}
-                    <div className="p-4 rounded-xl bg-[#1E3A47]/8 border border-[#1E3A47]/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <Video className="w-4 h-4 text-[#1E3A47]" />
-                          <span className="text-xs font-bold text-[#1E3A47]">
-                            {isEn ? "Google Meet Room" : "Sala Google Meet"}
-                          </span>
+                    {/* Google Meet Fixed Room Banner (if active) */}
+                    {lastBookedMeeting.status !== 'cancelled' && (
+                      <div className="p-4 rounded-xl bg-[#1E3A47]/8 border border-[#1E3A47]/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <Video className="w-4 h-4 text-[#1E3A47]" />
+                            <span className="text-xs font-bold text-[#1E3A47]">
+                              {isEn ? "Google Meet Room" : "Sala Google Meet"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#444444] font-mono select-all">
+                            {lastBookedMeeting.meetLink}
+                          </p>
                         </div>
-                        <p className="text-xs text-[#444444] font-mono select-all">
-                          {lastBookedMeeting.meetLink}
-                        </p>
-                      </div>
 
-                      <a
-                        href={lastBookedMeeting.meetLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-semibold shadow-xs transition-colors shrink-0"
+                        <a
+                          href={lastBookedMeeting.meetLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-semibold shadow-xs transition-colors shrink-0"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>{isEn ? "Join Room" : "Acessar Sala"}</span>
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Single Clean Confirmation Note (Strictly 1 note as requested) */}
+                    <div className="p-3.5 rounded-xl bg-[#F4F8F5] border border-[#D8E6DB] text-xs text-[#234B2E] flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <Mail className="w-4 h-4 text-[#2E7D32] shrink-0" />
+                        <span className="font-medium">
+                          {isEn
+                            ? `Um e-mail de confirmação foi disparado para ${lastBookedMeeting.clientEmail}.`
+                            : `Um e-mail de confirmação foi disparado para ${lastBookedMeeting.clientEmail}.`}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSendToClientEmail}
+                        className="text-[11px] font-bold text-[#1E3A47] hover:underline cursor-pointer shrink-0"
+                        title={isEn ? "Resend confirmation email" : "Reenviar e-mail"}
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>{isEn ? "Join Room" : "Acessar Sala"}</span>
-                      </a>
+                        {isEn ? "Resend" : "Reenviar"}
+                      </button>
                     </div>
 
-                    {/* Google Calendar & .ICS Synchronization */}
-                    <div className="space-y-2 pt-1">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#333333] block">
-                        {isEn ? "1. Sync with your calendar:" : "1. Sincronize com seu calendário:"}
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Single Discrete Google Calendar Button */}
+                    {lastBookedMeeting.status !== 'cancelled' && (
+                      <div className="pt-1">
                         <a
                           id="btn-sync-google-calendar"
                           href={generateGoogleCalendarUrl(lastBookedMeeting)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#4285F4] hover:bg-[#3367D6] text-white text-xs font-bold shadow-xs transition-colors text-center"
+                          className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#4285F4] hover:bg-[#3367D6] text-white text-xs sm:text-sm font-bold shadow-xs hover:shadow-sm transition-all text-center cursor-pointer"
                         >
                           <Calendar className="w-4 h-4" />
                           <span>{isEn ? "Add to Google Calendar" : "Adicionar ao Google Calendar"}</span>
                         </a>
-
-                        <button
-                          id="btn-download-ics"
-                          type="button"
-                          onClick={() => downloadIcsFile(lastBookedMeeting)}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-[#D5D5D0] hover:bg-[#F2F2EF] text-[#333333] text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                        >
-                          <FileDown className="w-4 h-4 text-[#666666]" />
-                          <span>{isEn ? "Download .ICS File" : "Baixar Arquivo .ICS"}</span>
-                        </button>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Direct Dispatch to Client (WhatsApp / Email) */}
-                    <div className="space-y-2 pt-2 border-t border-[#EAEAE7]">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#333333] block">
-                        {isEn ? "2. Send link directly to your inbox/phone:" : "2. Receber link e informações diretamente nos seus canais:"}
-                      </span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <button
-                          type="button"
-                          onClick={handleSendToClientWhatsApp}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#1EBE5D] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                    {/* Contact Bee-ginning on WhatsApp (Message directed to Bee-ginning, NOT client himself) */}
+                    {lastBookedMeeting.status !== 'cancelled' && (
+                      <div className="pt-0.5">
+                        <a
+                          id="btn-contact-bee-whatsapp"
+                          href={getWhatsAppUrlClientToRegina(lastBookedMeeting, isEn)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#25D366]/40 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#136C35] text-xs font-bold transition-all text-center cursor-pointer"
                         >
                           <MessageCircle className="w-4 h-4" />
-                          <span>{isEn ? "Send to my WhatsApp" : "Enviar para meu WhatsApp"}</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={handleSendToClientEmail}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                        >
-                          <Mail className="w-4 h-4" />
-                          <span>{isEn ? "Send to my Email" : "Enviar para meu E-mail"}</span>
-                        </button>
+                          <span>{isEn ? "Questions? Talk to Bee-ginning on WhatsApp" : "Dúvidas? Fale com a Bee-ginning no WhatsApp"}</span>
+                        </a>
                       </div>
+                    )}
+
+                    {/* AUTONOMOUS RESCHEDULE & CANCEL SECTION */}
+                    <div className="pt-3 border-t border-[#EAEAE7]">
+                      {lastBookedMeeting.status === 'cancelled' ? (
+                        <div className="p-4 rounded-xl bg-neutral-100 border border-neutral-200 text-center space-y-2.5">
+                          <p className="text-xs text-neutral-600">
+                            {isEn
+                              ? "Need a meeting at another date? You can pick a new time slot anytime."
+                              : "Precisa de uma reunião em outra ocasião? Você pode escolher um novo horário a qualquer momento."}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleScheduleNewMeeting}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-xs font-bold text-[#1A1A1A] cursor-pointer shadow-2xs"
+                          >
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>{isEn ? "Schedule New Meeting" : "Agendar Novo Horário"}</span>
+                          </button>
+                        </div>
+                      ) : isRescheduling ? (
+                        /* Inline Rescheduling Selector */
+                        <div className="p-4 rounded-xl bg-[#FFFDF9] border-2 border-amber-300 space-y-4 animate-fadeIn">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-amber-900">
+                              <RefreshCw className="w-4 h-4 text-amber-600 animate-spin-slow" />
+                              <h5 className="text-xs sm:text-sm font-bold">
+                                {isEn ? "Reschedule Meeting (Autonomous)" : "Reagendar Reunião"}
+                              </h5>
+                            </div>
+                            <span className="text-[11px] text-neutral-500">
+                              {isEn ? "Current:" : "Atual:"} {lastBookedMeeting.date.split('-').reverse().join('/')} às {lastBookedMeeting.time}
+                            </span>
+                          </div>
+
+                          {/* New Date Selector */}
+                          <div className="space-y-1.5">
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-700">
+                              {isEn ? "1. Select new date:" : "1. Escolha a nova data:"}
+                            </label>
+                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                              {availableDays.slice(0, 6).map((day) => {
+                                const isSelected = rescheduleDate === day.dateString;
+                                return (
+                                  <button
+                                    key={day.dateString}
+                                    type="button"
+                                    onClick={() => setRescheduleDate(day.dateString)}
+                                    className={`p-2 rounded-lg text-center border transition-all cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-[#1E3A47] text-white border-[#1E3A47] shadow-xs'
+                                        : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400'
+                                    }`}
+                                  >
+                                    <span className="block text-[9px] uppercase font-bold opacity-80">{day.dayOfWeek}</span>
+                                    <span className="block text-sm font-extrabold">{day.dayNumber}</span>
+                                    <span className="block text-[9px] opacity-75">{day.monthName}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* New Time Selector */}
+                          <div className="space-y-1.5">
+                            <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-700">
+                              {isEn ? "2. Select new time (Brasília Time / UTC-3):" : "2. Escolha o novo horário de início:"}
+                            </label>
+                            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                              {AVAILABLE_TIME_SLOTS.map((time) => {
+                                const isSelected = rescheduleTime === time;
+                                return (
+                                  <button
+                                    key={time}
+                                    type="button"
+                                    onClick={() => setRescheduleTime(time)}
+                                    className={`py-1.5 px-1 rounded-lg text-xs font-bold text-center border transition-all cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-[#E5A93B] text-[#1A1A1A] border-[#D99B26] shadow-xs'
+                                        : 'bg-white text-neutral-700 border-neutral-300 hover:border-[#D99B26]/50'
+                                    }`}
+                                  >
+                                    {time}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {rescheduleError && (
+                            <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-1.5">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>{rescheduleError}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsRescheduling(false);
+                                setRescheduleError('');
+                              }}
+                              className="px-3.5 py-1.5 rounded-lg border border-neutral-300 text-xs font-medium text-neutral-600 hover:bg-neutral-100 cursor-pointer"
+                            >
+                              {isEn ? "Keep current time" : "Manter horário atual"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleConfirmReschedule}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#E5A93B] hover:bg-[#D99B26] text-xs font-bold text-[#1A1A1A] cursor-pointer shadow-xs"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{isEn ? "Confirm Reschedule" : "Confirmar Novo Horário"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : isCancelling ? (
+                        /* Inline Cancellation Confirmation Prompt */
+                        <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-300 space-y-3 animate-fadeIn">
+                          <div className="flex items-start gap-2.5 text-rose-900">
+                            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                            <div className="text-xs leading-relaxed">
+                              <p className="font-bold">
+                                {isEn ? "Confirm meeting cancellation?" : "Confirmar cancelamento da reunião?"}
+                              </p>
+                              <p className="mt-0.5 text-rose-800">
+                                {isEn
+                                  ? `Are you sure you want to cancel the meeting on ${lastBookedMeeting.date.split('-').reverse().join('/')} at ${lastBookedMeeting.time}? An official notification will be dispatched from ${OFFICIAL_EMAIL} to ${lastBookedMeeting.clientEmail}.`
+                                  : `Tem certeza que deseja cancelar o agendamento de ${lastBookedMeeting.date.split('-').reverse().join('/')} às ${lastBookedMeeting.time}? Uma notificação oficial será disparada de ${OFFICIAL_EMAIL} para ${lastBookedMeeting.clientEmail}.`}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setIsCancelling(false)}
+                              className="px-3.5 py-1.5 rounded-lg border border-neutral-300 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 cursor-pointer"
+                            >
+                              {isEn ? "No, keep meeting" : "Não, manter reunião"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleConfirmCancel}
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer shadow-xs"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>{isEn ? "Yes, cancel appointment" : "Sim, confirmar cancelamento"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Normal Buttons for Autonomous Reschedule and Cancel */
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                          <span className="text-[11px] text-neutral-500 font-medium">
+                            {isEn ? "Need to make changes?" : "Precisa alterar algo?"}
+                          </span>
+
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <button
+                              type="button"
+                              id="btn-reagendar-reuniao"
+                              onClick={handleStartReschedule}
+                              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-amber-400/80 bg-amber-50/70 hover:bg-amber-100 text-amber-900 text-xs font-semibold transition-colors cursor-pointer"
+                              title={isEn ? "Reschedule this meeting" : "Reagendar para outro dia ou horário"}
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
+                              <span>{isEn ? "Reschedule Meeting" : "Reagendar Horário"}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              id="btn-cancelar-reuniao"
+                              onClick={handleStartCancel}
+                              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl border border-rose-300 bg-rose-50/60 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors cursor-pointer"
+                              title={isEn ? "Cancel this meeting" : "Cancelar este agendamento"}
+                            >
+                              <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                              <span>{isEn ? "Cancel Meeting" : "Cancelar Reunião"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
