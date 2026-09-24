@@ -38,6 +38,7 @@ import { compressImageFile, normalizeImageUrl } from '../utils/imageUtils';
 import {
   getContactConfig,
   saveContactConfig,
+  formatWhatsAppDisplay,
   getAllDemandForms,
   saveDemandForm,
   deleteDemandForm,
@@ -1486,16 +1487,24 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                           type="text"
                           required
                           value={configForm.whatsappNumber}
-                          onChange={(e) =>
-                            setConfigForm({ ...configForm, whatsappNumber: e.target.value.replace(/\D/g, '') })
-                          }
-                          placeholder="Ex: 5511987654321"
+                          onChange={(e) => {
+                            const digits = e.target.value.replace(/\D/g, '');
+                            setConfigForm({ ...configForm, whatsappNumber: digits });
+                          }}
+                          placeholder="Ex: 5511986297916"
                           className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs font-mono"
                         />
                       </div>
-                      <p className="text-[11px] text-[#888888] mt-1">
-                        Este é o número que recebe as mensagens do botão <strong>Vamos conversar?</strong> e formulários.
-                      </p>
+                      <div className="flex items-center justify-between mt-1 text-[11px] text-[#888888]">
+                        <span>
+                          Este é o número que recebe as mensagens do botão <strong>Vamos conversar?</strong> e formulários.
+                        </span>
+                        {configForm.whatsappNumber && (
+                          <span className="font-semibold text-[#1E3A47] bg-[#F2F2EE] px-2 py-0.5 rounded text-[10px]">
+                            Exibição: {formatWhatsAppDisplay(configForm.whatsappNumber)}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div>

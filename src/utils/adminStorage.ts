@@ -14,10 +14,10 @@ import {
 } from '../firebase';
 
 export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
-  whatsappNumber: '',
-  whatsappDisplay: '',
+  whatsappNumber: '5511986297916',
+  whatsappDisplay: '(11) 98629-7916',
   whatsappMessage: 'Olá! Vim pelo site da Beeginning 4 you e gostaria de conversar sobre uma ideia de negócio.',
-  email: 'contato@beeginning4you.com.br',
+  email: 'beeginning4you@gmail.com',
   meetUrl: 'https://meet.google.com/fxx-ctnv-hgm',
   fixedMeetUrl: 'https://meet.google.com/fxx-ctnv-hgm',
   businessHours: 'Segunda a Sexta das 08h30 às 18h30',
@@ -69,6 +69,15 @@ function isMockMeeting(item: Partial<MeetingAppointment>): boolean {
 function purgeLegacyMockData() {
   if (typeof window === 'undefined') return;
   try {
+    const configRaw = localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (configRaw) {
+      const parsed = JSON.parse(configRaw);
+      const sanitized = sanitizeContactConfig(parsed);
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+    } else {
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(DEFAULT_CONTACT_CONFIG));
+    }
+
     const formsRaw = localStorage.getItem(FORMS_STORAGE_KEY);
     if (formsRaw) {
       const parsed: DemandForm[] = JSON.parse(formsRaw);
@@ -98,7 +107,8 @@ if (typeof window !== 'undefined') {
   // 1. One-off initial direct fetch to prime cache from live Firestore
   fetchContactConfigFromFirestore().then((remoteConfig) => {
     if (remoteConfig && Object.keys(remoteConfig).length > 0) {
-      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(remoteConfig));
+      const sanitized = sanitizeContactConfig(remoteConfig);
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
       notifyStorageChange();
     }
   }).catch(() => {});
@@ -122,7 +132,8 @@ if (typeof window !== 'undefined') {
   // 2. Continuous real-time Firestore listeners
   subscribeContactConfigFromFirestore((remoteConfig) => {
     if (remoteConfig && Object.keys(remoteConfig).length > 0) {
-      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(remoteConfig));
+      const sanitized = sanitizeContactConfig(remoteConfig);
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
       notifyStorageChange();
     }
   });
@@ -144,6 +155,61 @@ if (typeof window !== 'undefined') {
   });
 }
 
+export function formatWhatsAppDisplay(raw: string): string {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (digits.length === 13 && digits.startsWith('55')) {
+    const ddd = digits.slice(2, 4);
+    const part1 = digits.slice(4, 9);
+    const part2 = digits.slice(9, 13);
+    return `(${ddd}) ${part1}-${part2}`;
+  }
+  if (digits.length === 11) {
+    const ddd = digits.slice(0, 2);
+    const part1 = digits.slice(2, 7);
+    const part2 = digits.slice(7, 11);
+    return `(${ddd}) ${part1}-${part2}`;
+  }
+  if (digits.length === 10) {
+    const ddd = digits.slice(0, 2);
+    const part1 = digits.slice(2, 6);
+    const part2 = digits.slice(6, 10);
+    return `(${ddd}) ${part1}-${part2}`;
+  }
+  return raw || '(11) 98629-7916';
+}
+
+export function sanitizeContactConfig(config: Partial<ContactConfig> | null | undefined): ContactConfig {
+  const merged: ContactConfig = {
+    ...DEFAULT_CONTACT_CONFIG,
+    ...(config || {}),
+  };
+
+  const rawWa = (merged.whatsappNumber || '').replace(/\D/g, '');
+  const rawDisplay = merged.whatsappDisplay || '';
+
+  // If number or display is placeholder or not containing official 98629
+  if (!rawWa || rawWa.includes('99999') || rawDisplay.includes('99999') || rawWa === '5511987654321' || !rawWa.includes('98629')) {
+    merged.whatsappNumber = '5511986297916';
+    merged.whatsappDisplay = '(11) 98629-7916';
+  } else {
+    merged.whatsappDisplay = formatWhatsAppDisplay(merged.whatsappNumber);
+  }
+
+  // Ensure official email if empty or old placeholder
+  if (!merged.email || merged.email.includes('example.com') || merged.email === 'contato@beeginning4you.com.br') {
+    merged.email = 'beeginning4you@gmail.com';
+  }
+
+  if (!merged.meetUrl || merged.meetUrl.includes('beg-4you-meet')) {
+    merged.meetUrl = 'https://meet.google.com/fxx-ctnv-hgm';
+  }
+  if (!merged.fixedMeetUrl || merged.fixedMeetUrl.includes('beg-4you-meet')) {
+    merged.fixedMeetUrl = 'https://meet.google.com/fxx-ctnv-hgm';
+  }
+
+  return merged;
+}
+
 // ========================
 // 1. Contact Configuration
 // ========================
@@ -152,13 +218,14 @@ export function getContactConfig(): ContactConfig {
     const raw = localStorage.getItem(CONFIG_STORAGE_KEY);
     if (!raw) return DEFAULT_CONTACT_CONFIG;
     const parsed = JSON.parse(raw);
-    if (!parsed.meetUrl || parsed.meetUrl.includes('beg-4you-meet')) {
-      parsed.meetUrl = 'https://meet.google.com/fxx-ctnv-hgm';
+    const sanitized = sanitizeContactConfig(parsed);
+    // If sanitized differs in display or number, persist it
+    if (sanitized.whatsappDisplay !== parsed.whatsappDisplay || sanitized.whatsappNumber !== parsed.whatsappNumber || sanitized.email !== parsed.email) {
+      try {
+        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+      } catch {}
     }
-    if (!parsed.fixedMeetUrl || parsed.fixedMeetUrl.includes('beg-4you-meet')) {
-      parsed.fixedMeetUrl = 'https://meet.google.com/fxx-ctnv-hgm';
-    }
-    return { ...DEFAULT_CONTACT_CONFIG, ...parsed };
+    return sanitized;
   } catch (e) {
     console.error('Error loading contact config', e);
     return DEFAULT_CONTACT_CONFIG;
@@ -167,9 +234,19 @@ export function getContactConfig(): ContactConfig {
 
 export function saveContactConfig(config: ContactConfig): ContactConfig {
   try {
-    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
-    saveContactConfigToFirestore(config);
+    let cleanWa = (config.whatsappNumber || '').replace(/\D/g, '');
+    if (cleanWa.length === 11 && !cleanWa.startsWith('55')) {
+      cleanWa = `55${cleanWa}`;
+    }
+    const updated: ContactConfig = {
+      ...config,
+      whatsappNumber: cleanWa || DEFAULT_CONTACT_CONFIG.whatsappNumber,
+      whatsappDisplay: formatWhatsAppDisplay(cleanWa || DEFAULT_CONTACT_CONFIG.whatsappNumber)
+    };
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(updated));
+    saveContactConfigToFirestore(updated);
     notifyStorageChange();
+    return updated;
   } catch (e) {
     console.error('Error saving contact config', e);
   }

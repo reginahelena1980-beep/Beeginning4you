@@ -29,6 +29,20 @@ export default function Footer({ onOpenConversation, onOpenAdmin }: FooterProps)
 
   const currentYear = new Date().getFullYear();
 
+  const rawWa = (config.whatsappNumber || '').replace(/\D/g, '');
+  const displayWa =
+    config.whatsappDisplay && !config.whatsappDisplay.includes('99999') && config.whatsappDisplay.includes('98629')
+      ? config.whatsappDisplay
+      : '(11) 98629-7916';
+  const cleanWa =
+    rawWa && !rawWa.includes('99999') && rawWa.includes('98629')
+      ? rawWa
+      : '5511986297916';
+  const displayEmail =
+    config.email && config.email !== 'contato@beeginning4you.com.br' && !config.email.includes('example.com')
+      ? config.email
+      : 'beeginning4you@gmail.com';
+
   return (
     <footer className="bg-[#181B1E] text-[#E0E0DB] border-t border-[#262A30] relative overflow-hidden">
       {/* Decorative warm ambient glow */}
@@ -101,14 +115,27 @@ export default function Footer({ onOpenConversation, onOpenAdmin }: FooterProps)
                 <Phone className="w-4 h-4 text-[#E5A93B] shrink-0" />
                 <span>
                   WhatsApp:{' '}
-                  <strong className="text-white font-mono">
-                    {config.whatsappDisplay || config.whatsappNumber || (isEn ? 'Direct via button above' : 'Direto no botão acima')}
-                  </strong>
+                  <a
+                    href={`https://wa.me/${cleanWa}?text=${encodeURIComponent(
+                      config.whatsappMessage || 'Olá! Vim pelo site da Beeginning 4 you e gostaria de conversar.'
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-white hover:text-[#E5A93B] font-mono font-bold transition-colors underline-offset-2 hover:underline"
+                    title={isEn ? "Chat directly on WhatsApp" : "Conversar direto pelo WhatsApp"}
+                  >
+                    {displayWa}
+                  </a>
                 </span>
               </li>
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-[#E5A93B] shrink-0" />
-                <span className="text-white">{config.email}</span>
+                <a
+                  href={`mailto:${displayEmail}`}
+                  className="text-white hover:text-[#E5A93B] transition-colors"
+                >
+                  {displayEmail}
+                </a>
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[#E5A93B] shrink-0" />

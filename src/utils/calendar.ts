@@ -6,16 +6,16 @@ export function getFixedGoogleMeetUrl(): string {
 }
 
 export function getOfficialEmail(): string {
-  return getContactConfig().email || 'contato@beeginning4you.com.br';
+  return getContactConfig().email || 'beeginning4you@gmail.com';
 }
 
 export function getOfficialWhatsApp(): string {
-  return getContactConfig().whatsappNumber || '';
+  return getContactConfig().whatsappNumber || '5511986297916';
 }
 
 export const FIXED_GOOGLE_MEET_URL = 'https://meet.google.com/fxx-ctnv-hgm';
-export const OFFICIAL_EMAIL = 'contato@beeginning4you.com.br';
-export const OFFICIAL_WHATSAPP = '';
+export const OFFICIAL_EMAIL = 'beeginning4you@gmail.com';
+export const OFFICIAL_WHATSAPP = '5511986297916';
 
 const STORAGE_KEY = 'beeginning_scheduled_meetings_v1';
 
