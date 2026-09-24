@@ -53,7 +53,7 @@ export default function Hero({ onOpenDiagnostic, onOpenConversation }: HeroProps
                   <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
                 </button>
 
-                {onOpenConversation && (
+                {/*onOpenConversation && (
                   <button
                     id="hero-board-talk"
                     onClick={onOpenConversation}
@@ -61,9 +61,9 @@ export default function Hero({ onOpenDiagnostic, onOpenConversation }: HeroProps
                   >
                     <span>{t.nav.cta}</span>
                   </button>
-                )}
+                )*/}
 
-                <button
+                {/*<button
                   id="hero-board-diagnostic"
                   onClick={() => {
                     if (onOpenDiagnostic) {
@@ -75,7 +75,7 @@ export default function Hero({ onOpenDiagnostic, onOpenConversation }: HeroProps
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-[#FAF8F5] border border-[#D5D0C6] text-[#2E3136] text-xs font-semibold uppercase tracking-wider transition-all duration-200 cursor-pointer shadow-xs active:scale-95"
                 >
                   <span>{t.nav.diagnostic}</span>
-                </button>
+                </button>*/}
               </div>
             </div>
 
