@@ -159,9 +159,28 @@ if (typeof window !== 'undefined') {
   // 1. One-off initial direct fetch to prime cache from live Firestore
   fetchContactConfigFromFirestore().then((remoteConfig) => {
     if (remoteConfig && Object.keys(remoteConfig).length > 0) {
-      const sanitized = sanitizeContactConfig(remoteConfig);
-      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
-      notifyStorageChange();
+      // If remote has valid availability, adopt it
+      if (remoteConfig.availability && Object.keys(remoteConfig.availability).length > 0) {
+        const sanitized = sanitizeContactConfig(remoteConfig);
+        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+        notifyStorageChange();
+      } else {
+        // Remote exists but lacks availability - if local has availability, upload local config to Firestore
+        const local = getContactConfig();
+        if (local?.availability && (local.availability.blockedSlots?.length || (local.availability.activeDaysOfWeek && local.availability.activeDaysOfWeek.length < 7))) {
+          saveContactConfigToFirestore(local);
+        } else {
+          const sanitized = sanitizeContactConfig(remoteConfig);
+          localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+          notifyStorageChange();
+        }
+      }
+    } else {
+      // Firestore has no config yet - upload current local config
+      const local = getContactConfig();
+      if (local) {
+        saveContactConfigToFirestore(local);
+      }
     }
   }).catch(() => {});
 

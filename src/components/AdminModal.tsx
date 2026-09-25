@@ -34,7 +34,9 @@ import {
   Ban,
   Check,
   Copy,
-  ShieldAlert
+  ShieldAlert,
+  CloudUpload,
+  RefreshCw
 } from 'lucide-react';
 import reginaDefaultPhoto from '../assets/images/regina_portrait_1790082408093.jpg';
 import {
@@ -46,7 +48,7 @@ import {
   BlockedSlot
 } from '../types';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, uploadProfilePhotoToStorage, fetchContactConfigFromFirestore } from '../firebase';
+import { db, uploadProfilePhotoToStorage, fetchContactConfigFromFirestore, saveContactConfigToFirestore } from '../firebase';
 import { compressImageFile, normalizeImageUrl } from '../utils/imageUtils';
 import { maskPhone } from '../utils/phoneMask';
 import {
@@ -97,6 +99,8 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [newCustomSlot, setNewCustomSlot] = useState<string>('');
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'checking' | 'connected' | 'rules_needed'>('checking');
   const [copiedRules, setCopiedRules] = useState<boolean>(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
+  const [cloudSyncSuccessMsg, setCloudSyncSuccessMsg] = useState<string>('');
   
   // Selected appointment for meeting notes / diagnostic
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingAppointment | null>(null);
@@ -177,13 +181,18 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     return () => window.removeEventListener(STORAGE_CHANGE_EVENT, loadData);
   }, []);
 
-  // Check live cloud connection with Firestore
+  // Check live cloud connection with Firestore & auto-sync local availability to cloud
   useEffect(() => {
     if (isOpen && activeTab === 'disponibilidade') {
       setCloudSyncStatus('checking');
       getDoc(doc(db, 'settings', 'contact_config'))
         .then(() => {
           setCloudSyncStatus('connected');
+          // Automatically ensure current local availability is persisted in the cloud
+          const current = getContactConfig();
+          if (current?.availability) {
+            saveContactConfigToFirestore(current).catch(() => {});
+          }
         })
         .catch((err) => {
           console.warn('[Cloud Sync Check] Firestore check notice:', err);
@@ -191,6 +200,23 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
         });
     }
   }, [isOpen, activeTab]);
+
+  const handleManualCloudSync = async () => {
+    setIsSyncingCloud(true);
+    setCloudSyncSuccessMsg('');
+    try {
+      const currentConfig = getContactConfig();
+      await saveContactConfigToFirestore(currentConfig);
+      setCloudSyncStatus('connected');
+      const nowTime = new Date().toLocaleTimeString('pt-BR');
+      setCloudSyncSuccessMsg(`Configurações e bloqueios publicados na nuvem com sucesso às ${nowTime}! Qualquer visitante já consegue visualizar.`);
+      setTimeout(() => setCloudSyncSuccessMsg(''), 6000);
+    } catch (err: any) {
+      alert('Erro ao sincronizar com a nuvem do Firebase: ' + (err?.message || err));
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
 
   // Sync selected meeting notes form
   useEffect(() => {
@@ -1679,19 +1705,45 @@ service cloud.firestore {
                   )}
 
                   {cloudSyncStatus === 'connected' && (
-                    <div className="p-3 px-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span className="font-bold">
-                          Nuvem Conectada & Sincronizada:
-                        </span>
-                        <span>
-                          Qualquer visitante em outro computador, celular ou aba anônima verá os mesmos horários e bloqueios em tempo real.
-                        </span>
+                    <div className="p-3.5 px-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-emerald-950">
+                              Nuvem Firebase Conectada:
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-100/90 px-1.5 py-0.5 rounded">
+                              beegining4you (Firestore Live)
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                            {cloudSyncSuccessMsg || 'Suas alterações de horários e folgas estão sincronizadas e ativas para todos os visitantes do site.'}
+                          </p>
+                        </div>
                       </div>
-                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                        Firestore Live
-                      </span>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={handleManualCloudSync}
+                          disabled={isSyncingCloud}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                          title="Garante que as folgas e faixas de horários salvas no seu navegador sejam enviadas para a nuvem do Firebase"
+                        >
+                          {isSyncingCloud ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              <span>Sincronizando...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CloudUpload className="w-3.5 h-3.5" />
+                              <span>Sincronizar com a Nuvem Agora</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
 
