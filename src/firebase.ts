@@ -18,9 +18,9 @@ import { ContactConfig, DemandForm, MeetingAppointment } from './types';
 // Provided Firebase credentials for Beeginning 4 you
 export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDVXVS2FzKaGZcn3IALp5av6WDZaN_2vsc",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "beegining4you.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "beegining4you",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "beegining4you.firebasestorage.app",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "beeginning4you.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "beeginning4you",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "beeginning4you.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "14993501241",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:14993501241:web:f8697fb01d54f99864b1e8",
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-MQNEB7WND8"
@@ -99,6 +99,23 @@ if (typeof window !== 'undefined') {
   testFirestoreConnection();
 }
 
+export function removeUndefinedFields<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map((item) => removeUndefinedFields(item)) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, any>)) {
+      if (value !== undefined) {
+        cleaned[key] = removeUndefinedFields(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
 // -------------------------------------------------------------
 // 1. Contact Configuration in Firestore
 // -------------------------------------------------------------
@@ -121,10 +138,12 @@ export async function saveContactConfigToFirestore(config: ContactConfig): Promi
   const path = `${SETTINGS_COLLECTION}/${CONTACT_CONFIG_DOC}`;
   try {
     const docRef = doc(db, SETTINGS_COLLECTION, CONTACT_CONFIG_DOC);
+    const sanitized = removeUndefinedFields(config);
     await setDoc(docRef, {
-      ...config,
+      ...sanitized,
       updatedAt: serverTimestamp()
     }, { merge: true });
+    console.log('[Firestore] Configuração de canais e disponibilidade salva na nuvem com sucesso.');
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
@@ -173,8 +192,9 @@ export async function saveDemandToFirestore(demand: DemandForm): Promise<void> {
   const path = `${DEMANDS_COLLECTION}/${demand.id}`;
   try {
     const docRef = doc(db, DEMANDS_COLLECTION, demand.id);
+    const sanitized = removeUndefinedFields(demand);
     await setDoc(docRef, {
-      ...demand,
+      ...sanitized,
       syncedAt: new Date().toISOString()
     }, { merge: true });
   } catch (error) {
@@ -237,8 +257,9 @@ export async function saveAppointmentToFirestore(appointment: MeetingAppointment
   const path = `${APPOINTMENTS_COLLECTION}/${appointment.id}`;
   try {
     const docRef = doc(db, APPOINTMENTS_COLLECTION, appointment.id);
+    const sanitized = removeUndefinedFields(appointment);
     await setDoc(docRef, {
-      ...appointment,
+      ...sanitized,
       syncedAt: new Date().toISOString()
     }, { merge: true });
   } catch (error) {

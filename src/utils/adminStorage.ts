@@ -118,9 +118,43 @@ function purgeLegacyMockData() {
   }
 }
 
-// Initialise Firebase real-time listeners and direct initial fetch
+// Initialise Firebase real-time listeners, server API dual-sync, and direct initial fetch
 if (typeof window !== 'undefined') {
   purgeLegacyMockData();
+
+  // 0. Immediate fetch from backend API (fast, reliable server persistence)
+  fetch('/api/config')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (data?.config && Object.keys(data.config).length > 0) {
+        const sanitized = sanitizeContactConfig(data.config);
+        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+        notifyStorageChange();
+      }
+    })
+    .catch(() => {});
+
+  fetch('/api/appointments')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (Array.isArray(data?.appointments)) {
+        const cleaned = data.appointments.filter((m: any) => !isMockMeeting(m));
+        localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(cleaned));
+        notifyStorageChange();
+      }
+    })
+    .catch(() => {});
+
+  fetch('/api/demands')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (Array.isArray(data?.demands)) {
+        const cleaned = data.demands.filter((f: any) => !isMockDemand(f));
+        localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(cleaned));
+        notifyStorageChange();
+      }
+    })
+    .catch(() => {});
 
   // 1. One-off initial direct fetch to prime cache from live Firestore
   fetchContactConfigFromFirestore().then((remoteConfig) => {
@@ -278,6 +312,13 @@ export function saveContactConfig(config: ContactConfig): ContactConfig {
     };
     localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(updated));
     saveContactConfigToFirestore(updated);
+    try {
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: updated })
+      }).catch(() => {});
+    } catch {}
     notifyStorageChange();
     return updated;
   } catch (e) {
@@ -490,6 +531,13 @@ export function saveDemandForm(
   const updated = [newForm, ...forms.filter((f) => f.id !== newForm.id)];
   localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(updated));
   saveDemandToFirestore(newForm);
+  try {
+    fetch('/api/demands', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ demand: newForm })
+    }).catch(() => {});
+  } catch {}
   notifyStorageChange();
   return newForm;
 }
@@ -647,6 +695,13 @@ export function saveAppointmentWithDiagnostic(
 
   localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(updated));
   saveAppointmentToFirestore(withDiagnostic);
+  try {
+    fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appointment: withDiagnostic })
+    }).catch(() => {});
+  } catch {}
   notifyStorageChange();
   return updated;
 }

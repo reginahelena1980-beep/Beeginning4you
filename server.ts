@@ -16,6 +16,33 @@ app.use(express.json());
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const OFFICIAL_EMAIL = process.env.GMAIL_USER || 'beeginning4you@gmail.com';
 const SERVER_CONFIG_FILE = path.resolve(__dirname, 'admin_server_config.json');
+const SERVER_DATA_FILE = path.resolve(__dirname, 'admin_app_data.json');
+
+interface ServerAppData {
+  config?: any;
+  appointments?: any[];
+  demands?: any[];
+}
+
+function getServerAppData(): ServerAppData {
+  try {
+    if (fs.existsSync(SERVER_DATA_FILE)) {
+      const content = fs.readFileSync(SERVER_DATA_FILE, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    console.warn('[Server Data] Erro ao ler dados persistidos no servidor', err);
+  }
+  return {};
+}
+
+function saveServerAppData(data: ServerAppData) {
+  try {
+    fs.writeFileSync(SERVER_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('[Server Data] Erro ao salvar dados no servidor', err);
+  }
+}
 
 // Helper to get active server credentials
 function getServerConfig(): {
@@ -59,6 +86,95 @@ app.post('/api/admin/save-server-config', (req, res) => {
     };
     saveServerConfig(updated);
     return res.status(200).json({ success: true, message: 'Configurações salvas no servidor.' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+// 1.1 API: Obter e salvar configurações e disponibilidade pública da plataforma
+app.get('/api/config', (_req, res) => {
+  try {
+    const data = getServerAppData();
+    return res.status(200).json({ success: true, config: data.config || null });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+app.post('/api/config', (req, res) => {
+  try {
+    const { config } = req.body;
+    if (!config) {
+      return res.status(400).json({ success: false, error: 'Configuração não informada.' });
+    }
+    const current = getServerAppData();
+    current.config = config;
+    saveServerAppData(current);
+    return res.status(200).json({ success: true, message: 'Configurações sincronizadas no servidor.', config });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+// 1.2 API: Agendamentos de Reuniões Google Meet (Dual sync)
+app.get('/api/appointments', (_req, res) => {
+  try {
+    const data = getServerAppData();
+    return res.status(200).json({ success: true, appointments: data.appointments || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+app.post('/api/appointments', (req, res) => {
+  try {
+    const { appointment } = req.body;
+    if (!appointment || !appointment.id) {
+      return res.status(400).json({ success: false, error: 'Agendamento inválido.' });
+    }
+    const current = getServerAppData();
+    const existing = current.appointments || [];
+    const index = existing.findIndex((a) => a.id === appointment.id);
+    if (index >= 0) {
+      existing[index] = appointment;
+    } else {
+      existing.unshift(appointment);
+    }
+    current.appointments = existing;
+    saveServerAppData(current);
+    return res.status(200).json({ success: true, message: 'Agendamento sincronizado no servidor.', appointment });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+// 1.3 API: Demandas e Formulários de Contato (Dual sync)
+app.get('/api/demands', (_req, res) => {
+  try {
+    const data = getServerAppData();
+    return res.status(200).json({ success: true, demands: data.demands || [] });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message });
+  }
+});
+
+app.post('/api/demands', (req, res) => {
+  try {
+    const { demand } = req.body;
+    if (!demand || !demand.id) {
+      return res.status(400).json({ success: false, error: 'Demanda inválida.' });
+    }
+    const current = getServerAppData();
+    const existing = current.demands || [];
+    const index = existing.findIndex((d) => d.id === demand.id);
+    if (index >= 0) {
+      existing[index] = demand;
+    } else {
+      existing.unshift(demand);
+    }
+    current.demands = existing;
+    saveServerAppData(current);
+    return res.status(200).json({ success: true, message: 'Demanda sincronizada no servidor.', demand });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
   }

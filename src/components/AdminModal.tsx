@@ -32,7 +32,9 @@ import {
   Loader2,
   Key,
   Ban,
-  Check
+  Check,
+  Copy,
+  ShieldAlert
 } from 'lucide-react';
 import reginaDefaultPhoto from '../assets/images/regina_portrait_1790082408093.jpg';
 import {
@@ -43,7 +45,8 @@ import {
   AdminAvailabilityConfig,
   BlockedSlot
 } from '../types';
-import { uploadProfilePhotoToStorage } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, uploadProfilePhotoToStorage, fetchContactConfigFromFirestore } from '../firebase';
 import { compressImageFile, normalizeImageUrl } from '../utils/imageUtils';
 import { maskPhone } from '../utils/phoneMask';
 import {
@@ -92,6 +95,8 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [newBlockTime, setNewBlockTime] = useState<string>('ALL_DAY');
   const [newBlockReason, setNewBlockReason] = useState<string>('');
   const [newCustomSlot, setNewCustomSlot] = useState<string>('');
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<'checking' | 'connected' | 'rules_needed'>('checking');
+  const [copiedRules, setCopiedRules] = useState<boolean>(false);
   
   // Selected appointment for meeting notes / diagnostic
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingAppointment | null>(null);
@@ -171,6 +176,21 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     window.addEventListener(STORAGE_CHANGE_EVENT, loadData);
     return () => window.removeEventListener(STORAGE_CHANGE_EVENT, loadData);
   }, []);
+
+  // Check live cloud connection with Firestore
+  useEffect(() => {
+    if (isOpen && activeTab === 'disponibilidade') {
+      setCloudSyncStatus('checking');
+      getDoc(doc(db, 'settings', 'contact_config'))
+        .then(() => {
+          setCloudSyncStatus('connected');
+        })
+        .catch((err) => {
+          console.warn('[Cloud Sync Check] Firestore check notice:', err);
+          setCloudSyncStatus('rules_needed');
+        });
+    }
+  }, [isOpen, activeTab]);
 
   // Sync selected meeting notes form
   useEffect(() => {
@@ -1563,6 +1583,117 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                       Horários bloqueados manualmente por você ou preenchidos por agendamentos de clientes ficam <strong>imediatamente indisponíveis</strong> no site em tempo real.
                     </p>
                   </div>
+
+                  {/* Cloud Synchronization Diagnostic Card */}
+                  {cloudSyncStatus === 'rules_needed' && (
+                    <div className="bg-amber-50/90 border-2 border-amber-300 p-5 rounded-2xl space-y-3 shadow-xs animate-fadeIn">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-amber-500 text-white shrink-0 mt-0.5">
+                          <ShieldAlert className="w-5 h-5" />
+                        </div>
+                        <div className="space-y-1 flex-1">
+                          <h5 className="text-sm font-bold text-amber-950">
+                            Atenção para Visitantes e Outros Dispositivos (Regras do Firebase)
+                          </h5>
+                          <p className="text-xs text-amber-900 leading-relaxed">
+                            Suas alterações de horários e folgas estão salvas no seu navegador, porém seu banco de dados na nuvem (<strong>Firebase Firestore</strong>) está com as permissões de leitura bloqueadas por padrão no Console do Firebase. Por isso, <strong>visitantes em outro computador ou celular ainda não conseguem carregar seus bloqueios</strong>.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-amber-200 space-y-2.5 text-xs text-neutral-800">
+                        <p className="font-bold text-[#1E3A47]">
+                          👉 Como liberar a visualização pública para todos os visitantes em 30 segundos:
+                        </p>
+                        <ol className="list-decimal list-inside space-y-1.5 text-xs text-neutral-700 leading-relaxed">
+                          <li>
+                            Acesse a aba de Regras no Console do Firebase:{' '}
+                            <a
+                              href="https://console.firebase.google.com/project/beeginning4you/firestore/rules"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-bold text-[#1E3A47] underline hover:text-[#D99B26]"
+                            >
+                              <span>Abrir Firebase Console Rules (beeginning4you)</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </li>
+                          <li>Substitua o conteúdo da caixa de texto pelo código de segurança oficial abaixo:</li>
+                          <div className="relative my-2">
+                            <pre className="p-3 bg-neutral-900 text-emerald-400 font-mono text-[11px] rounded-lg overflow-x-auto leading-tight select-all">
+{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /settings/{settingId} { allow read, write: if true; }
+    match /demands/{demandId} { allow read, write: if true; }
+    match /appointments/{appointmentId} { allow read, write: if true; }
+    match /{document=**} { allow read, write: if false; }
+  }
+}`}
+                            </pre>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const rulesText = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /settings/{settingId} { allow read, write: if true; }\n    match /demands/{demandId} { allow read, write: if true; }\n    match /appointments/{appointmentId} { allow read, write: if true; }\n    match /{document=**} { allow read, write: if false; }\n  }\n}`;
+                                navigator.clipboard.writeText(rulesText);
+                                setCopiedRules(true);
+                                setTimeout(() => setCopiedRules(false), 4000);
+                              }}
+                              className="absolute top-2 right-2 px-2.5 py-1 rounded bg-white hover:bg-neutral-100 text-neutral-800 text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              {copiedRules ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span className="text-emerald-700">Copiado!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3 text-neutral-600" />
+                                  <span>Copiar Código</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <li>Clique no botão azul <strong>Publicar (Publish)</strong> no topo do Firebase Console.</li>
+                        </ol>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[11px] text-neutral-500">
+                            Assim que você publicar no console, o status abaixo passará a verde automaticamente.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCloudSyncStatus('checking');
+                              getDoc(doc(db, 'settings', 'contact_config'))
+                                .then(() => setCloudSyncStatus('connected'))
+                                .catch(() => setCloudSyncStatus('rules_needed'));
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-[#1E3A47] hover:bg-[#162B34] text-white text-[11px] font-bold transition-colors cursor-pointer"
+                          >
+                            Reverificar Conexão
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {cloudSyncStatus === 'connected' && (
+                    <div className="p-3 px-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span className="font-bold">
+                          Nuvem Conectada & Sincronizada:
+                        </span>
+                        <span>
+                          Qualquer visitante em outro computador, celular ou aba anônima verá os mesmos horários e bloqueios em tempo real.
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                        Firestore Live
+                      </span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     {/* Left Column: Weekly Schedule & Time Slots */}
