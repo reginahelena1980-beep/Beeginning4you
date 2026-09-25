@@ -1,4 +1,11 @@
-import { ContactConfig, DemandForm, MeetingAppointment, MeetingDiagnosticData } from '../types';
+import {
+  ContactConfig,
+  DemandForm,
+  MeetingAppointment,
+  MeetingDiagnosticData,
+  AdminAvailabilityConfig,
+  BlockedSlot
+} from '../types';
 import {
   saveContactConfigToFirestore,
   subscribeContactConfigFromFirestore,
@@ -12,6 +19,13 @@ import {
   subscribeAppointmentsFromFirestore,
   fetchAppointmentsFromFirestore
 } from '../firebase';
+
+export const DEFAULT_AVAILABILITY_CONFIG: AdminAvailabilityConfig = {
+  activeDaysOfWeek: [1, 2, 3, 4, 5], // Seg, Ter, Qua, Qui, Sex
+  dailyTimeSlots: ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'],
+  slotDurationMinutes: 45,
+  blockedSlots: []
+};
 
 export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
   whatsappNumber: '5511986297916',
@@ -27,6 +41,7 @@ export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
   gmailAppPassword: '',
   whatsappGatewayUrl: '',
   whatsappGatewayToken: '',
+  availability: DEFAULT_AVAILABILITY_CONFIG
 };
 
 const CONFIG_STORAGE_KEY = 'beeginning_contact_config_v1';
@@ -210,11 +225,25 @@ export function sanitizeContactConfig(config: Partial<ContactConfig> | null | un
     merged.fixedMeetUrl = 'https://meet.google.com/fxx-ctnv-hgm';
   }
 
+  // Sanitize Availability configuration
+  const rawAvail = config?.availability || merged.availability;
+  const sanitizedAvailability: AdminAvailabilityConfig = {
+    activeDaysOfWeek: Array.isArray(rawAvail?.activeDaysOfWeek) && rawAvail.activeDaysOfWeek.length > 0
+      ? rawAvail.activeDaysOfWeek
+      : DEFAULT_AVAILABILITY_CONFIG.activeDaysOfWeek,
+    dailyTimeSlots: Array.isArray(rawAvail?.dailyTimeSlots) && rawAvail.dailyTimeSlots.length > 0
+      ? rawAvail.dailyTimeSlots
+      : DEFAULT_AVAILABILITY_CONFIG.dailyTimeSlots,
+    slotDurationMinutes: rawAvail?.slotDurationMinutes || 45,
+    blockedSlots: Array.isArray(rawAvail?.blockedSlots) ? rawAvail.blockedSlots : []
+  };
+  merged.availability = sanitizedAvailability;
+
   return merged;
 }
 
 // ========================
-// 1. Contact Configuration
+// 1. Contact Configuration & Availability
 // ========================
 export function getContactConfig(): ContactConfig {
   try {
@@ -244,7 +273,8 @@ export function saveContactConfig(config: ContactConfig): ContactConfig {
     const updated: ContactConfig = {
       ...config,
       whatsappNumber: cleanWa || DEFAULT_CONTACT_CONFIG.whatsappNumber,
-      whatsappDisplay: formatWhatsAppDisplay(cleanWa || DEFAULT_CONTACT_CONFIG.whatsappNumber)
+      whatsappDisplay: formatWhatsAppDisplay(cleanWa || DEFAULT_CONTACT_CONFIG.whatsappNumber),
+      availability: config.availability || DEFAULT_AVAILABILITY_CONFIG
     };
     localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(updated));
     saveContactConfigToFirestore(updated);
@@ -254,6 +284,124 @@ export function saveContactConfig(config: ContactConfig): ContactConfig {
     console.error('Error saving contact config', e);
   }
   return config;
+}
+
+// ========================
+// Availability & Schedule Management
+// ========================
+export function getAvailabilityConfig(): AdminAvailabilityConfig {
+  const config = getContactConfig();
+  return config.availability || DEFAULT_AVAILABILITY_CONFIG;
+}
+
+export function saveAvailabilityConfig(avail: Partial<AdminAvailabilityConfig>): AdminAvailabilityConfig {
+  const curConfig = getContactConfig();
+  const currentAvail = curConfig.availability || DEFAULT_AVAILABILITY_CONFIG;
+  const updatedAvail: AdminAvailabilityConfig = {
+    ...currentAvail,
+    ...avail,
+    updatedAt: new Date().toISOString()
+  };
+  const updatedConfig: ContactConfig = {
+    ...curConfig,
+    availability: updatedAvail
+  };
+  saveContactConfig(updatedConfig);
+  return updatedAvail;
+}
+
+export function addBlockedSlot(block: { date: string; time?: string; reason?: string }): BlockedSlot {
+  const currentAvail = getAvailabilityConfig();
+  const newBlock: BlockedSlot = {
+    id: `block-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    date: block.date,
+    time: block.time || '',
+    reason: block.reason || 'Compromisso externo / Folga',
+    createdAt: new Date().toISOString()
+  };
+  const updatedBlocked = [newBlock, ...(currentAvail.blockedSlots || [])];
+  saveAvailabilityConfig({ blockedSlots: updatedBlocked });
+  return newBlock;
+}
+
+export function removeBlockedSlot(blockId: string): void {
+  const currentAvail = getAvailabilityConfig();
+  const updatedBlocked = (currentAvail.blockedSlots || []).filter((b) => b.id !== blockId);
+  saveAvailabilityConfig({ blockedSlots: updatedBlocked });
+}
+
+export function isDateBlocked(dateStr: string): boolean {
+  const currentAvail = getAvailabilityConfig();
+  return (currentAvail.blockedSlots || []).some(
+    (b) => b.date === dateStr && (!b.time || b.time === 'ALL_DAY' || b.time.trim() === '')
+  );
+}
+
+export function isSlotBlocked(dateStr: string, timeStr: string): boolean {
+  const currentAvail = getAvailabilityConfig();
+  return (currentAvail.blockedSlots || []).some(
+    (b) => b.date === dateStr && (!b.time || b.time === 'ALL_DAY' || b.time.trim() === '' || b.time === timeStr)
+  );
+}
+
+export function isSlotBooked(dateStr: string, timeStr: string, excludeAppointmentId?: string): boolean {
+  const appointments = getAdminAppointments();
+  return appointments.some(
+    (a) =>
+      a.id !== excludeAppointmentId &&
+      a.date === dateStr &&
+      a.time === timeStr &&
+      a.status !== 'cancelled'
+  );
+}
+
+export function isSlotAvailable(dateStr: string, timeStr: string, excludeAppointmentId?: string): boolean {
+  if (isSlotBlocked(dateStr, timeStr)) return false;
+  if (isSlotBooked(dateStr, timeStr, excludeAppointmentId)) return false;
+  return true;
+}
+
+export function getAvailableSlotsForDate(
+  dateStr: string,
+  excludeAppointmentId?: string
+): {
+  allSlots: string[];
+  freeSlots: string[];
+  occupiedSlots: string[];
+  blockedSlots: string[];
+} {
+  const avail = getAvailabilityConfig();
+  const allSlots = avail.dailyTimeSlots || DEFAULT_AVAILABILITY_CONFIG.dailyTimeSlots;
+
+  if (isDateBlocked(dateStr)) {
+    return {
+      allSlots,
+      freeSlots: [],
+      occupiedSlots: [],
+      blockedSlots: [...allSlots]
+    };
+  }
+
+  const freeSlots: string[] = [];
+  const occupiedSlots: string[] = [];
+  const blockedSlots: string[] = [];
+
+  allSlots.forEach((slot) => {
+    if (isSlotBlocked(dateStr, slot)) {
+      blockedSlots.push(slot);
+    } else if (isSlotBooked(dateStr, slot, excludeAppointmentId)) {
+      occupiedSlots.push(slot);
+    } else {
+      freeSlots.push(slot);
+    }
+  });
+
+  return {
+    allSlots,
+    freeSlots,
+    occupiedSlots,
+    blockedSlots
+  };
 }
 
 // ========================

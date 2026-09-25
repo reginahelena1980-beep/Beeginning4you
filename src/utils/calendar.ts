@@ -1,5 +1,50 @@
 import { MeetingAppointment } from '../types';
-import { getContactConfig, saveAppointmentWithDiagnostic } from './adminStorage';
+import {
+  getContactConfig,
+  saveAppointmentWithDiagnostic,
+  getAvailabilityConfig,
+  isDateBlocked,
+  isSlotBlocked,
+  isSlotBooked,
+  isSlotAvailable,
+  getAvailableSlotsForDate
+} from './adminStorage';
+
+export {
+  isSlotBlocked,
+  isSlotBooked,
+  isSlotAvailable,
+  getAvailableSlotsForDate
+};
+
+export function validateAppointmentSlot(
+  date: string,
+  time: string,
+  excludeAppointmentId?: string
+): { valid: boolean; reason?: string } {
+  if (!date || !time) {
+    return { valid: false, reason: 'Por favor, selecione uma data e um horário válidos.' };
+  }
+  if (isDateBlocked(date)) {
+    return {
+      valid: false,
+      reason: 'Esta data está temporariamente bloqueada para atendimentos (folga/compromisso do administrador). Por favor, selecione outro dia.'
+    };
+  }
+  if (isSlotBlocked(date, time)) {
+    return {
+      valid: false,
+      reason: 'Este horário foi bloqueado pelo administrador para atendimento (compromisso externo). Por favor, selecione outro horário disponível.'
+    };
+  }
+  if (isSlotBooked(date, time, excludeAppointmentId)) {
+    return {
+      valid: false,
+      reason: 'Este horário acabou de ser agendado por outro cliente e já se encontra ocupado. Por favor, selecione outro horário livre.'
+    };
+  }
+  return { valid: true };
+}
 
 export function getFixedGoogleMeetUrl(): string {
   return getContactConfig().meetUrl || 'https://meet.google.com/fxx-ctnv-hgm';
@@ -371,14 +416,15 @@ export function getWhatsAppUrlReginaToClient(appointment: MeetingAppointment, is
 }
 
 /**
- * Returns the upcoming 12 business days (skips weekends)
+ * Returns upcoming available business days based on the admin's availability config (active days of week)
  */
-export function getAvailableBusinessDays(): Array<{
+export function getAvailableBusinessDays(count = 14): Array<{
   dateString: string; // YYYY-MM-DD
-  dayOfWeek: string;  // Seg, Ter, Qua, Qui, Sex
+  dayOfWeek: string;  // Seg, Ter, Qua, Qui, Sex, Sáb, Dom
   dayNumber: number;
   monthName: string;
   isToday: boolean;
+  isFullyBlocked: boolean;
 }> {
   const days: Array<{
     dateString: string;
@@ -386,7 +432,13 @@ export function getAvailableBusinessDays(): Array<{
     dayNumber: number;
     monthName: string;
     isToday: boolean;
+    isFullyBlocked: boolean;
   }> = [];
+
+  const avail = getAvailabilityConfig();
+  const activeDays = avail.activeDaysOfWeek && avail.activeDaysOfWeek.length > 0
+    ? avail.activeDaysOfWeek
+    : [1, 2, 3, 4, 5];
 
   const today = new Date();
   let cursor = new Date(today);
@@ -398,21 +450,24 @@ export function getAvailableBusinessDays(): Array<{
     'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
   ];
 
-  while (days.length < 12) {
+  let safety = 0;
+  while (days.length < count && safety < 60) {
+    safety++;
     const dayOfWeekIndex = cursor.getDay();
-    // Skip Saturdays (6) and Sundays (0)
-    if (dayOfWeekIndex !== 0 && dayOfWeekIndex !== 6) {
+    if (activeDays.includes(dayOfWeekIndex)) {
       const year = cursor.getFullYear();
       const month = String(cursor.getMonth() + 1).padStart(2, '0');
       const day = String(cursor.getDate()).padStart(2, '0');
       const dateString = `${year}-${month}-${day}`;
 
+      const isFullyBlocked = isDateBlocked(dateString);
       days.push({
         dateString,
         dayOfWeek: weekdayNames[dayOfWeekIndex],
         dayNumber: cursor.getDate(),
         monthName: monthNames[cursor.getMonth()],
-        isToday: false
+        isToday: false,
+        isFullyBlocked
       });
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -430,4 +485,12 @@ export const AVAILABLE_TIME_SLOTS = [
   '16:00',
   '17:00'
 ];
+
+export function getDailyTimeSlots(): string[] {
+  const avail = getAvailabilityConfig();
+  if (Array.isArray(avail.dailyTimeSlots) && avail.dailyTimeSlots.length > 0) {
+    return avail.dailyTimeSlots;
+  }
+  return AVAILABLE_TIME_SLOTS;
+}
 

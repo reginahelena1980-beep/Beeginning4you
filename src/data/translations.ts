@@ -16,7 +16,7 @@ export const TRANSLATIONS = {
       solutions: 'O Que Fazemos',
       audience: 'Para Quem',
       projects: 'Projetos Reais',
-      //booking: 'Agendamento',
+      booking: 'Agendamento',
       cta: 'Vamos conversar?',
       diagnostic: 'Pedir diagnóstico',
       ourSolutions: 'Nossas soluções',

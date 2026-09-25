@@ -22,23 +22,29 @@ import {
 import { MeetingAppointment } from '../types';
 import {
   getContactConfig,
-  saveDemandForm
+  saveDemandForm,
+  getAvailabilityConfig,
+  STORAGE_CHANGE_EVENT
 } from '../utils/adminStorage';
 import {
   saveAppointment,
   generateGoogleCalendarUrl,
   getAvailableBusinessDays,
   AVAILABLE_TIME_SLOTS,
+  getDailyTimeSlots,
   cancelAppointmentInStorage,
   rescheduleAppointmentInStorage,
   sendOfficialConfirmationEmail,
   sendOfficialRescheduleEmail,
   sendOfficialCancellationEmail,
   getWhatsAppUrlClientToRegina,
+  validateAppointmentSlot,
+  getAvailableSlotsForDate,
   OFFICIAL_EMAIL,
   OFFICIAL_WHATSAPP
 } from '../utils/calendar';
 import { useLanguage } from '../context/LanguageContext';
+import { maskPhone } from '../utils/phoneMask';
 
 interface ConversationModalProps {
   isOpen: boolean;
@@ -64,6 +70,8 @@ export default function ConversationModal({
   const [waError, setWaError] = useState('');
 
   // Meeting Booking form state
+  const [availableDays, setAvailableDays] = useState(getAvailableBusinessDays());
+  const [dailySlots, setDailySlots] = useState<string[]>(getDailyTimeSlots());
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedTime, setSelectedTime] = useState<string>('');
   const [clientName, setClientName] = useState('');
@@ -83,26 +91,69 @@ export default function ConversationModal({
   const [isCancelling, setIsCancelling] = useState(false);
   const [actionNotice, setActionNotice] = useState<string>('');
 
-  const availableDays = getAvailableBusinessDays();
+  const refreshAvailability = () => {
+    setConfig(getContactConfig());
+    const freshDays = getAvailableBusinessDays();
+    setAvailableDays(freshDays);
+    const freshSlots = getDailyTimeSlots();
+    setDailySlots(freshSlots);
+  };
 
   // Reset and load initial on open
   useEffect(() => {
     if (isOpen) {
-      setConfig(getContactConfig());
+      refreshAvailability();
       if (initialTab) {
         setActiveTab(initialTab);
-      }
-      if (availableDays.length > 0 && !selectedDate) {
-        setSelectedDate(availableDays[0].dateString);
-      }
-      if (AVAILABLE_TIME_SLOTS.length > 0 && !selectedTime) {
-        setSelectedTime(AVAILABLE_TIME_SLOTS[1]); // Default to 10:00
       }
       setIsRescheduling(false);
       setIsCancelling(false);
       setActionNotice('');
     }
   }, [isOpen, initialTab]);
+
+  // Real-time synchronization: listen for appointment bookings or admin schedule/blocks changes
+  useEffect(() => {
+    window.addEventListener(STORAGE_CHANGE_EVENT, refreshAvailability);
+    return () => window.removeEventListener(STORAGE_CHANGE_EVENT, refreshAvailability);
+  }, []);
+
+  // Pick first available unblocked date if none selected or if current is blocked
+  useEffect(() => {
+    if (isOpen && availableDays.length > 0) {
+      const isCurrentValid = availableDays.some((d) => d.dateString === selectedDate && !d.isFullyBlocked);
+      if (!isCurrentValid) {
+        const firstUnblocked = availableDays.find((d) => !d.isFullyBlocked) || availableDays[0];
+        if (firstUnblocked) {
+          setSelectedDate(firstUnblocked.dateString);
+        }
+      }
+    }
+  }, [isOpen, availableDays, selectedDate]);
+
+  // When selectedDate changes, automatically pick the first free time slot
+  useEffect(() => {
+    if (selectedDate) {
+      const { freeSlots } = getAvailableSlotsForDate(selectedDate);
+      if (freeSlots.length > 0 && (!selectedTime || !freeSlots.includes(selectedTime))) {
+        setSelectedTime(freeSlots[0]);
+      } else if (freeSlots.length === 0) {
+        setSelectedTime('');
+      }
+    }
+  }, [selectedDate, availableDays, dailySlots]);
+
+  // When rescheduleDate changes, automatically pick the first free time slot
+  useEffect(() => {
+    if (isRescheduling && rescheduleDate) {
+      const { freeSlots } = getAvailableSlotsForDate(rescheduleDate, lastBookedMeeting?.id);
+      if (freeSlots.length > 0 && (!rescheduleTime || !freeSlots.includes(rescheduleTime))) {
+        setRescheduleTime(freeSlots[0]);
+      } else if (freeSlots.length === 0) {
+        setRescheduleTime('');
+      }
+    }
+  }, [rescheduleDate, isRescheduling, lastBookedMeeting]);
 
   // Handle ESC key to close
   useEffect(() => {
@@ -187,6 +238,18 @@ export default function ConversationModal({
       return;
     }
 
+    // Strict slot availability & conflict validation
+    const slotCheck = validateAppointmentSlot(selectedDate, selectedTime);
+    if (!slotCheck.valid) {
+      setBookingError(
+        slotCheck.reason ||
+          (isEn
+            ? 'This slot is no longer available. Please select another time.'
+            : 'Este horário acabou de se tornar indisponível. Por favor, escolha outro horário.')
+      );
+      return;
+    }
+
     setBookingError('');
     const newAppointment: MeetingAppointment = {
       id: `meet-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -252,6 +315,18 @@ export default function ConversationModal({
         isEn
           ? 'Please select a different date or time to reschedule.'
           : 'Por favor, selecione uma data ou horário diferente para reagendar.'
+      );
+      return;
+    }
+
+    // Strict slot availability check excluding this appointment
+    const slotCheck = validateAppointmentSlot(rescheduleDate, rescheduleTime, lastBookedMeeting.id);
+    if (!slotCheck.valid) {
+      setRescheduleError(
+        slotCheck.reason ||
+          (isEn
+            ? 'This slot is unavailable for rescheduling. Please select another slot.'
+            : 'Este horário está indisponível para reagendamento. Por favor, escolha outro horário.')
       );
       return;
     }
@@ -849,20 +924,35 @@ export default function ConversationModal({
                             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                               {availableDays.slice(0, 6).map((day) => {
                                 const isSelected = rescheduleDate === day.dateString;
+                                const isBlocked = day.isFullyBlocked;
                                 return (
                                   <button
                                     key={day.dateString}
                                     type="button"
-                                    onClick={() => setRescheduleDate(day.dateString)}
-                                    className={`p-2 rounded-lg text-center border transition-all cursor-pointer ${
-                                      isSelected
-                                        ? 'bg-[#1E3A47] text-white border-[#1E3A47] shadow-xs'
-                                        : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400'
+                                    disabled={isBlocked}
+                                    onClick={() => {
+                                      if (!isBlocked) {
+                                        setRescheduleDate(day.dateString);
+                                        setRescheduleError('');
+                                      }
+                                    }}
+                                    className={`p-2 rounded-lg text-center border transition-all ${
+                                      isBlocked
+                                        ? 'bg-neutral-100 text-neutral-400 border-neutral-200 opacity-60 cursor-not-allowed'
+                                        : isSelected
+                                        ? 'bg-[#1E3A47] text-white border-[#1E3A47] shadow-xs cursor-pointer'
+                                        : 'bg-white text-neutral-700 border-neutral-300 hover:border-neutral-400 cursor-pointer'
                                     }`}
+                                    title={isBlocked ? (isEn ? "Date blocked by admin" : "Data bloqueada pelo administrador") : undefined}
                                   >
                                     <span className="block text-[9px] uppercase font-bold opacity-80">{day.dayOfWeek}</span>
                                     <span className="block text-sm font-extrabold">{day.dayNumber}</span>
                                     <span className="block text-[9px] opacity-75">{day.monthName}</span>
+                                    {isBlocked && (
+                                      <span className="block text-[8px] font-bold text-rose-500 uppercase mt-0.5">
+                                        {isEn ? "Blocked" : "Bloqueado"}
+                                      </span>
+                                    )}
                                   </button>
                                 );
                               })}
@@ -871,28 +961,78 @@ export default function ConversationModal({
 
                           {/* New Time Selector */}
                           <div className="space-y-1.5">
-                            <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-700">
-                              {isEn ? "2. Select new time (Brasília Time / UTC-3):" : "2. Escolha o novo horário de início:"}
-                            </label>
-                            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-                              {AVAILABLE_TIME_SLOTS.map((time) => {
-                                const isSelected = rescheduleTime === time;
-                                return (
-                                  <button
-                                    key={time}
-                                    type="button"
-                                    onClick={() => setRescheduleTime(time)}
-                                    className={`py-1.5 px-1 rounded-lg text-xs font-bold text-center border transition-all cursor-pointer ${
-                                      isSelected
-                                        ? 'bg-[#E5A93B] text-[#1A1A1A] border-[#D99B26] shadow-xs'
-                                        : 'bg-white text-neutral-700 border-neutral-300 hover:border-[#D99B26]/50'
-                                    }`}
-                                  >
-                                    {time}
-                                  </button>
-                                );
-                              })}
+                            <div className="flex items-center justify-between">
+                              <label className="block text-[11px] font-bold uppercase tracking-wider text-neutral-700">
+                                {isEn ? "2. Select new time (Brasília Time / UTC-3):" : "2. Escolha o novo horário de início:"}
+                              </label>
+                              <div className="flex items-center gap-2 text-[10px] text-neutral-500">
+                                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> {isEn ? "Free" : "Livre"}</span>
+                                <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-neutral-400 inline-block"></span> {isEn ? "Unavailable" : "Indisponível"}</span>
+                              </div>
                             </div>
+
+                            {(() => {
+                              const reschSlots = rescheduleDate
+                                ? getAvailableSlotsForDate(rescheduleDate, lastBookedMeeting.id)
+                                : { allSlots: dailySlots, freeSlots: [], occupiedSlots: [], blockedSlots: [] };
+                              const slotsToRender = reschSlots.allSlots && reschSlots.allSlots.length > 0 ? reschSlots.allSlots : dailySlots;
+
+                              if (reschSlots.freeSlots.length === 0) {
+                                return (
+                                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 text-center">
+                                    {isEn
+                                      ? "No slots available on this date. Please choose another date."
+                                      : "Não há horários disponíveis nesta data. Por favor, selecione outra data acima."}
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                                  {slotsToRender.map((time) => {
+                                    const isBooked = reschSlots.occupiedSlots.includes(time);
+                                    const isBlocked = reschSlots.blockedSlots.includes(time);
+                                    const isUnavailable = isBooked || isBlocked;
+                                    const isSelected = rescheduleTime === time && !isUnavailable;
+
+                                    return (
+                                      <button
+                                        key={time}
+                                        type="button"
+                                        disabled={isUnavailable}
+                                        onClick={() => {
+                                          if (!isUnavailable) {
+                                            setRescheduleTime(time);
+                                            setRescheduleError('');
+                                          }
+                                        }}
+                                        className={`py-1.5 px-1 rounded-lg text-xs font-bold text-center border transition-all ${
+                                          isUnavailable
+                                            ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-50 line-through'
+                                            : isSelected
+                                            ? 'bg-[#E5A93B] text-[#1A1A1A] border-[#D99B26] shadow-xs cursor-pointer'
+                                            : 'bg-white text-neutral-700 border-neutral-300 hover:border-[#D99B26]/50 cursor-pointer'
+                                        }`}
+                                        title={
+                                          isBooked
+                                            ? (isEn ? "Slot booked by another client" : "Horário já reservado por outro cliente")
+                                            : isBlocked
+                                            ? (isEn ? "Slot blocked by admin" : "Horário bloqueado pelo administrador")
+                                            : undefined
+                                        }
+                                      >
+                                        <span>{time}</span>
+                                        {isUnavailable && (
+                                          <span className="block text-[8px] no-underline font-normal text-neutral-500">
+                                            {isBooked ? (isEn ? "Booked" : "Ocupado") : (isEn ? "Blocked" : "Bloqueado")}
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           {rescheduleError && (
@@ -1023,22 +1163,37 @@ export default function ConversationModal({
 
                   {/* Step 1: Select Date */}
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#333333]">
-                      {isEn ? "1. Select available date:" : "1. Escolha a data disponível:"}
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[#333333]">
+                        {isEn ? "1. Select available date:" : "1. Escolha a data disponível:"}
+                      </label>
+                      <span className="text-[11px] text-[#777777]">
+                        {isEn ? "Live availability" : "Disponibilidade em tempo real"}
+                      </span>
+                    </div>
                     <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                       {availableDays.slice(0, 6).map((day) => {
                         const isSelected = selectedDate === day.dateString;
+                        const isBlocked = day.isFullyBlocked;
                         return (
                           <button
                             key={day.dateString}
                             type="button"
-                            onClick={() => setSelectedDate(day.dateString)}
-                            className={`p-2.5 rounded-xl text-center border transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#1E3A47] text-white border-[#1E3A47] shadow-sm'
-                                : 'bg-[#FFFFFF] text-[#333333] border-[#D5D5D0] hover:border-[#1E3A47]/50 hover:bg-[#F9F9F8]'
+                            disabled={isBlocked}
+                            onClick={() => {
+                              if (!isBlocked) {
+                                setSelectedDate(day.dateString);
+                                setBookingError('');
+                              }
+                            }}
+                            className={`p-2.5 rounded-xl text-center border transition-all ${
+                              isBlocked
+                                ? 'bg-neutral-100 text-neutral-400 border-neutral-200 opacity-60 cursor-not-allowed'
+                                : isSelected
+                                ? 'bg-[#1E3A47] text-white border-[#1E3A47] shadow-sm cursor-pointer'
+                                : 'bg-[#FFFFFF] text-[#333333] border-[#D5D5D0] hover:border-[#1E3A47]/50 hover:bg-[#F9F9F8] cursor-pointer'
                             }`}
+                            title={isBlocked ? (isEn ? "Date blocked by admin" : "Data bloqueada pelo administrador") : undefined}
                           >
                             <span className="block text-[10px] uppercase font-bold opacity-80">
                               {day.dayOfWeek}
@@ -1047,6 +1202,11 @@ export default function ConversationModal({
                               {day.dayNumber}
                             </span>
                             <span className="block text-[10px] opacity-75">{day.monthName}</span>
+                            {isBlocked && (
+                              <span className="block text-[8px] font-bold text-rose-500 uppercase mt-0.5">
+                                {isEn ? "Blocked" : "Bloqueado"}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -1055,28 +1215,85 @@ export default function ConversationModal({
 
                   {/* Step 2: Select Time */}
                   <div className="space-y-2">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#333333]">
-                      {isEn ? "2. Select start time (Brasília Time / UTC-3):" : "2. Escolha o horário de início (Horário de Brasília):"}
-                    </label>
-                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                      {AVAILABLE_TIME_SLOTS.map((time) => {
-                        const isSelected = selectedTime === time;
-                        return (
-                          <button
-                            key={time}
-                            type="button"
-                            onClick={() => setSelectedTime(time)}
-                            className={`py-2 px-1 rounded-xl text-xs font-bold text-center border transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#E5A93B] text-[#1A1A1A] border-[#D99B26] shadow-sm'
-                                : 'bg-[#FFFFFF] text-[#444444] border-[#D5D5D0] hover:border-[#D99B26]/50 hover:bg-[#FFFDF7]'
-                            }`}
-                          >
-                            {time}
-                          </button>
-                        );
-                      })}
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold uppercase tracking-wider text-[#333333]">
+                        {isEn ? "2. Select start time (Brasília Time / UTC-3):" : "2. Escolha o horário de início (Horário de Brasília):"}
+                      </label>
+                      <div className="flex items-center gap-2 text-[10px] text-neutral-500">
+                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> {isEn ? "Free" : "Livre"}</span>
+                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-neutral-400 inline-block"></span> {isEn ? "Unavailable" : "Indisponível"}</span>
+                      </div>
                     </div>
+
+                    {(() => {
+                      const slotStatus = selectedDate
+                        ? getAvailableSlotsForDate(selectedDate)
+                        : { allSlots: dailySlots, freeSlots: [], occupiedSlots: [], blockedSlots: [] };
+                      const slotsToRender = slotStatus.allSlots && slotStatus.allSlots.length > 0 ? slotStatus.allSlots : dailySlots;
+
+                      if (slotStatus.freeSlots.length === 0) {
+                        return (
+                          <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 text-center space-y-1">
+                            <p className="font-semibold">
+                              {isEn
+                                ? "No open slots on this date."
+                                : "Nenhum horário livre nesta data."}
+                            </p>
+                            <p className="text-[11px] text-amber-700">
+                              {isEn
+                                ? "All slots for this day are either booked or blocked. Please select another date above."
+                                : "Todos os horários desta data estão ocupados por outros clientes ou bloqueados pelo administrador. Por favor, selecione outro dia acima."}
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                          {slotsToRender.map((time) => {
+                            const isBooked = slotStatus.occupiedSlots.includes(time);
+                            const isBlocked = slotStatus.blockedSlots.includes(time);
+                            const isUnavailable = isBooked || isBlocked;
+                            const isSelected = selectedTime === time && !isUnavailable;
+
+                            return (
+                              <button
+                                key={time}
+                                type="button"
+                                disabled={isUnavailable}
+                                onClick={() => {
+                                  if (!isUnavailable) {
+                                    setSelectedTime(time);
+                                    setBookingError('');
+                                  }
+                                }}
+                                className={`py-2 px-1 rounded-xl text-xs font-bold text-center border transition-all ${
+                                  isUnavailable
+                                    ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed opacity-50 line-through'
+                                    : isSelected
+                                    ? 'bg-[#E5A93B] text-[#1A1A1A] border-[#D99B26] shadow-sm cursor-pointer'
+                                    : 'bg-[#FFFFFF] text-[#444444] border-[#D5D5D0] hover:border-[#D99B26]/50 hover:bg-[#FFFDF7] cursor-pointer'
+                                }`}
+                                title={
+                                  isBooked
+                                    ? (isEn ? "Slot booked by another client" : "Horário já reservado por outro cliente")
+                                    : isBlocked
+                                    ? (isEn ? "Slot blocked by admin" : "Horário bloqueado pelo administrador")
+                                    : undefined
+                                }
+                              >
+                                <span>{time}</span>
+                                {isUnavailable && (
+                                  <span className="block text-[8px] no-underline font-normal text-neutral-500">
+                                    {isBooked ? (isEn ? "Booked" : "Ocupado") : (isEn ? "Blocked" : "Bloqueado")}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Step 3: Contact Details */}
@@ -1118,11 +1335,12 @@ export default function ConversationModal({
                         <div className="relative">
                           <Phone className="w-3.5 h-3.5 absolute left-3 top-3 text-[#888888]" />
                           <input
-                            type="text"
+                            type="tel"
                             required
                             value={clientPhone}
-                            onChange={(e) => setClientPhone(e.target.value)}
-                            placeholder={isEn ? "WhatsApp / Phone *" : "WhatsApp / Telefone *"}
+                            onChange={(e) => setClientPhone(maskPhone(e.target.value))}
+                            placeholder={isEn ? "WhatsApp / Phone (XX) XXXXX-XXXX *" : "WhatsApp / Telefone (XX) XXXXX-XXXX *"}
+                            maxLength={15}
                             className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs text-[#1A1A1A] outline-none"
                           />
                         </div>

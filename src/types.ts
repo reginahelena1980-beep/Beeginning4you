@@ -137,6 +137,22 @@ export interface DemandForm {
   origin?: string;
 }
 
+export interface BlockedSlot {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm or empty/ALL_DAY for full day
+  reason?: string;
+  createdAt: string;
+}
+
+export interface AdminAvailabilityConfig {
+  activeDaysOfWeek: number[]; // 0 = Domingo, 1 = Segunda, 2 = Terça, 3 = Quarta, 4 = Quinta, 5 = Sexta, 6 = Sábado. Default: [1, 2, 3, 4, 5]
+  dailyTimeSlots: string[]; // e.g. ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00']
+  slotDurationMinutes: number; // default 45
+  blockedSlots: BlockedSlot[]; // manual blocks
+  updatedAt?: string;
+}
+
 export interface ContactConfig {
   whatsappNumber: string; // Clean number for wa.me e.g. 5511999999999
   whatsappDisplay: string; // Formatted e.g. (11) 99999-9999
@@ -151,4 +167,5 @@ export interface ContactConfig {
   gmailAppPassword?: string; // Senha de Aplicativo do Gmail (16 caracteres) para disparo automático
   whatsappGatewayUrl?: string; // URL do Gateway de WhatsApp para disparo direto (opcional)
   whatsappGatewayToken?: string; // Token do Gateway de WhatsApp (opcional)
+  availability?: AdminAvailabilityConfig; // Gestão de disponibilidade e bloqueios de horários
 }

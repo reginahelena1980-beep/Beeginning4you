@@ -30,12 +30,22 @@ import {
   RotateCcw,
   Image as ImageIcon,
   Loader2,
-  Key
+  Key,
+  Ban,
+  Check
 } from 'lucide-react';
 import reginaDefaultPhoto from '../assets/images/regina_portrait_1790082408093.jpg';
-import { MeetingAppointment, DemandForm, ContactConfig, MeetingDiagnosticData } from '../types';
+import {
+  MeetingAppointment,
+  DemandForm,
+  ContactConfig,
+  MeetingDiagnosticData,
+  AdminAvailabilityConfig,
+  BlockedSlot
+} from '../types';
 import { uploadProfilePhotoToStorage } from '../firebase';
 import { compressImageFile, normalizeImageUrl } from '../utils/imageUtils';
+import { maskPhone } from '../utils/phoneMask';
 import {
   getContactConfig,
   saveContactConfig,
@@ -46,6 +56,11 @@ import {
   getAdminAppointments,
   saveAppointmentWithDiagnostic,
   deleteAppointmentInStorage,
+  getAvailabilityConfig,
+  saveAvailabilityConfig,
+  addBlockedSlot,
+  removeBlockedSlot,
+  DEFAULT_AVAILABILITY_CONFIG,
   STORAGE_CHANGE_EVENT
 } from '../utils/adminStorage';
 import { generateGoogleCalendarUrl } from '../utils/calendar';
@@ -60,13 +75,23 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string>('');
 
-  const [activeTab, setActiveTab] = useState<'agenda' | 'demandas' | 'config'>('agenda');
+  const [activeTab, setActiveTab] = useState<'agenda' | 'demandas' | 'disponibilidade' | 'config'>('agenda');
   const [showConfigPassword, setShowConfigPassword] = useState<boolean>(false);
 
   // Admin Data state
   const [config, setConfig] = useState<ContactConfig>(getContactConfig());
   const [appointments, setAppointments] = useState<MeetingAppointment[]>([]);
   const [demands, setDemands] = useState<DemandForm[]>([]);
+  const [availability, setAvailability] = useState<AdminAvailabilityConfig>(getAvailabilityConfig());
+  const [availNotice, setAvailNotice] = useState<string>('');
+  const [newBlockDate, setNewBlockDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [newBlockTime, setNewBlockTime] = useState<string>('ALL_DAY');
+  const [newBlockReason, setNewBlockReason] = useState<string>('');
+  const [newCustomSlot, setNewCustomSlot] = useState<string>('');
   
   // Selected appointment for meeting notes / diagnostic
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingAppointment | null>(null);
@@ -121,6 +146,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     const curAppointments = getAdminAppointments();
     setAppointments(curAppointments);
     setDemands(getAllDemandForms());
+    setAvailability(getAvailabilityConfig());
 
     // Auto-select first appointment if none is selected
     setSelectedMeeting((prev) => {
@@ -445,6 +471,106 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     }
   };
 
+  // ========================
+  // Availability & Scheduling Handlers
+  // ========================
+  const handleToggleDayOfWeek = (dayIndex: number) => {
+    const current = availability.activeDaysOfWeek || [];
+    let updated: number[];
+    if (current.includes(dayIndex)) {
+      if (current.length === 1) {
+        alert('É necessário manter pelo menos um dia da semana ativo para atendimento.');
+        return;
+      }
+      updated = current.filter((d) => d !== dayIndex);
+    } else {
+      updated = [...current, dayIndex].sort((a, b) => a - b);
+    }
+    const saved = saveAvailabilityConfig({ activeDaysOfWeek: updated });
+    setAvailability(saved);
+    setAvailNotice('Dias de atendimento atualizados com sucesso!');
+    setTimeout(() => setAvailNotice(''), 3500);
+  };
+
+  const handleSetPresetDays = (days: number[]) => {
+    const saved = saveAvailabilityConfig({ activeDaysOfWeek: days });
+    setAvailability(saved);
+    setAvailNotice('Dias de atendimento configurados com sucesso!');
+    setTimeout(() => setAvailNotice(''), 3500);
+  };
+
+  const handleAddSlot = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const clean = newCustomSlot.trim();
+    if (!clean) return;
+    if (!/^\d{2}:\d{2}$/.test(clean)) {
+      alert('Formato de horário inválido. Utilize o formato HH:mm (ex: 08:30 ou 18:00).');
+      return;
+    }
+    const current = availability.dailyTimeSlots || [];
+    if (current.includes(clean)) {
+      alert('Este horário já está cadastrado na sua grade de atendimento.');
+      return;
+    }
+    const updated = [...current, clean].sort();
+    const saved = saveAvailabilityConfig({ dailyTimeSlots: updated });
+    setAvailability(saved);
+    setNewCustomSlot('');
+    setAvailNotice(`Horário ${clean} adicionado à sua grade de atendimento!`);
+    setTimeout(() => setAvailNotice(''), 3500);
+  };
+
+  const handleRemoveSlot = (slotToRemove: string) => {
+    const current = availability.dailyTimeSlots || [];
+    if (current.length <= 1) {
+      alert('É necessário manter ao menos um horário de atendimento ativo na grade.');
+      return;
+    }
+    const updated = current.filter((s) => s !== slotToRemove);
+    const saved = saveAvailabilityConfig({ dailyTimeSlots: updated });
+    setAvailability(saved);
+    setAvailNotice(`Horário ${slotToRemove} removido da grade.`);
+    setTimeout(() => setAvailNotice(''), 3500);
+  };
+
+  const handleResetSlots = () => {
+    const saved = saveAvailabilityConfig({
+      dailyTimeSlots: DEFAULT_AVAILABILITY_CONFIG.dailyTimeSlots
+    });
+    setAvailability(saved);
+    setAvailNotice('Faixas de horários restauradas para o padrão comercial (09h às 17h)!');
+    setTimeout(() => setAvailNotice(''), 3500);
+  };
+
+  const handleAddBlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBlockDate) {
+      alert('Por favor, selecione uma data para o bloqueio.');
+      return;
+    }
+    const timeToBlock = newBlockTime === 'ALL_DAY' ? '' : newBlockTime;
+    addBlockedSlot({
+      date: newBlockDate,
+      time: timeToBlock,
+      reason: newBlockReason.trim() || (timeToBlock ? 'Compromisso externo' : 'Folga / Sem atendimento')
+    });
+    setAvailability(getAvailabilityConfig());
+    setNewBlockReason('');
+    setAvailNotice(
+      timeToBlock
+        ? `Horário ${timeToBlock} do dia ${newBlockDate.split('-').reverse().join('/')} bloqueado com sucesso! Já está indisponível para novos agendamentos no site.`
+        : `Dia ${newBlockDate.split('-').reverse().join('/')} inteiro bloqueado para atendimentos! Já está indisponível para novos agendamentos no site.`
+    );
+    setTimeout(() => setAvailNotice(''), 4500);
+  };
+
+  const handleRemoveBlock = (blockId: string) => {
+    removeBlockedSlot(blockId);
+    setAvailability(getAvailabilityConfig());
+    setAvailNotice('Bloqueio removido! O horário foi liberado imediatamente para agendamentos no site.');
+    setTimeout(() => setAvailNotice(''), 4000);
+  };
+
   const filteredDemands = demands.filter((item) => {
     const s = (item.status || '').toLowerCase();
     const orig = (item.origin || item.source || '').toLowerCase();
@@ -647,6 +773,29 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
               <button
                 type="button"
+                id="btn-admin-tab-disponibilidade"
+                onClick={() => {
+                  setActiveTab('disponibilidade');
+                  setSelectedMeeting(null);
+                  setSelectedDemand(null);
+                }}
+                className={`py-3 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
+                  activeTab === 'disponibilidade'
+                    ? 'border-[#1E3A47] text-[#1E3A47]'
+                    : 'border-transparent text-[#666666] hover:text-[#1A1A1A]'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>Disponibilidade & Horários</span>
+                {availability.blockedSlots && availability.blockedSlots.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-amber-200 text-amber-900">
+                    {availability.blockedSlots.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   setActiveTab('config');
                   setSelectedMeeting(null);
@@ -680,12 +829,24 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                     {/* Left Column: Meetings List */}
                     <div className="lg:col-span-5 space-y-3">
                       <div className="flex items-center justify-between pb-1">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-[#555555]">
-                          Reuniões Agendadas
-                        </h4>
-                        <span className="text-xs font-semibold text-[#888888]">
-                          Total: {appointments.length}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#555555]">
+                            Reuniões Agendadas
+                          </h4>
+                          <span className="text-xs font-semibold text-[#888888]">
+                            ({appointments.length})
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('disponibilidade')}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#E5A93B]/40 bg-[#E5A93B]/10 hover:bg-[#E5A93B]/20 text-[#8F6413] text-[11px] font-bold transition-colors cursor-pointer"
+                          title="Definir dias da semana, faixas de horários e bloqueios manuais"
+                        >
+                          <Clock className="w-3 h-3 text-[#D99B26]" />
+                          <span>Gerenciar Disponibilidade</span>
+                        </button>
                       </div>
 
                       {appointments.length === 0 ? (
@@ -1302,10 +1463,11 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                             <div>
                               <label className="block text-[11px] font-bold text-[#444444] mb-1">WhatsApp / Telefone</label>
                               <input
-                                type="text"
+                                type="tel"
                                 value={newDemandForm.phone}
-                                onChange={(e) => setNewDemandForm({ ...newDemandForm, phone: e.target.value })}
+                                onChange={(e) => setNewDemandForm({ ...newDemandForm, phone: maskPhone(e.target.value) })}
                                 placeholder="(11) 99999-9999"
+                                maxLength={15}
                                 className="w-full px-3 py-2 rounded-lg border border-[#D5D5D0] focus:border-[#1E3A47] outline-none"
                               />
                             </div>
@@ -1377,7 +1539,376 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                 </div>
               )}
 
-              {/* TAB 3: CONFIGURAÇÃO DE CONTATO & CANAIS */}
+              {/* TAB 3: DISPONIBILIDADE & HORÁRIOS */}
+              {activeTab === 'disponibilidade' && (
+                <div className="space-y-6">
+                  {/* Feedback Banner */}
+                  {availNotice && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-medium animate-fadeIn">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{availNotice}</span>
+                    </div>
+                  )}
+
+                  {/* Header Intro */}
+                  <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E5E5E2] shadow-xs space-y-1">
+                    <div className="flex items-center gap-2 text-[#1E3A47]">
+                      <Clock className="w-5 h-5 text-[#E5A93B]" />
+                      <h4 className="text-base font-bold text-[#1A1A1A]">
+                        Gestão de Disponibilidade & Agenda de Atendimento
+                      </h4>
+                    </div>
+                    <p className="text-xs text-[#666666]">
+                      Defina com total autonomia quais <strong>dias da semana</strong> e <strong>faixas de horários</strong> você está disponível para reuniões.
+                      Horários bloqueados manualmente por você ou preenchidos por agendamentos de clientes ficam <strong>imediatamente indisponíveis</strong> no site em tempo real.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left Column: Weekly Schedule & Time Slots */}
+                    <div className="lg:col-span-7 space-y-6">
+                      
+                      {/* CARD 1: DIAS DA SEMANA */}
+                      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E5E5E2] shadow-xs space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#F0F0EE]">
+                          <div>
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
+                              1. Dias da Semana de Atendimento
+                            </h5>
+                            <p className="text-[11px] text-[#666666] mt-0.5">
+                              Clique no dia para ativar ou desativar o atendimento no site
+                            </p>
+                          </div>
+                          
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleSetPresetDays([1, 2, 3, 4, 5])}
+                              className="px-2.5 py-1 rounded-lg bg-[#F5F5F3] hover:bg-[#EAEAE7] text-[10px] font-bold text-[#333333] transition-colors cursor-pointer"
+                            >
+                              Seg a Sex
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSetPresetDays([1, 2, 3, 4, 5, 6])}
+                              className="px-2.5 py-1 rounded-lg bg-[#F5F5F3] hover:bg-[#EAEAE7] text-[10px] font-bold text-[#333333] transition-colors cursor-pointer"
+                            >
+                              Seg a Sáb
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSetPresetDays([0, 1, 2, 3, 4, 5, 6])}
+                              className="px-2.5 py-1 rounded-lg bg-[#F5F5F3] hover:bg-[#EAEAE7] text-[10px] font-bold text-[#333333] transition-colors cursor-pointer"
+                            >
+                              Todos
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Weekdays Toggle Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                          {[
+                            { index: 1, label: 'Seg', name: 'Segunda-feira' },
+                            { index: 2, label: 'Ter', name: 'Terça-feira' },
+                            { index: 3, label: 'Qua', name: 'Quarta-feira' },
+                            { index: 4, label: 'Qui', name: 'Quinta-feira' },
+                            { index: 5, label: 'Sex', name: 'Sexta-feira' },
+                            { index: 6, label: 'Sáb', name: 'Sábado' },
+                            { index: 0, label: 'Dom', name: 'Domingo' }
+                          ].map((day) => {
+                            const isActive = (availability.activeDaysOfWeek || []).includes(day.index);
+                            return (
+                              <button
+                                key={day.index}
+                                type="button"
+                                onClick={() => handleToggleDayOfWeek(day.index)}
+                                className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                                  isActive
+                                    ? 'bg-[#1E3A47] text-white border-[#1E3A47] shadow-sm'
+                                    : 'bg-white text-neutral-400 border-neutral-200 hover:border-neutral-300'
+                                }`}
+                              >
+                                <span className="text-xs font-extrabold uppercase">{day.label}</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                  isActive ? 'bg-[#E5A93B] text-[#1A1A1A]' : 'bg-neutral-100 text-neutral-500'
+                                }`}>
+                                  {isActive ? 'Ativo' : 'Off'}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* CARD 2: FAIXAS DE HORÁRIOS */}
+                      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E5E5E2] shadow-xs space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#F0F0EE]">
+                          <div>
+                            <h5 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
+                              2. Faixas de Horários de Atendimento (Slots Padrão)
+                            </h5>
+                            <p className="text-[11px] text-[#666666] mt-0.5">
+                              Estes são os horários oferecidos aos clientes nos dias ativos (sessões de 45 min)
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleResetSlots}
+                            className="px-2.5 py-1 rounded-lg border border-neutral-300 hover:bg-neutral-100 text-[10px] font-bold text-neutral-700 transition-colors cursor-pointer self-start sm:self-auto"
+                            title="Restaurar lista de horários para 09:00, 10:00, 11:00, 14:00, 15:00, 16:00, 17:00"
+                          >
+                            Restaurar Padrão
+                          </button>
+                        </div>
+
+                        {/* Current Slots Chips */}
+                        <div className="flex flex-wrap gap-2">
+                          {(availability.dailyTimeSlots || []).map((slot) => (
+                            <div
+                              key={slot}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF8F5] border border-[#E5A93B]/40 text-xs font-bold text-[#1A1A1A] shadow-2xs"
+                            >
+                              <Clock className="w-3.5 h-3.5 text-[#E5A93B]" />
+                              <span>{slot}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSlot(slot)}
+                                className="p-0.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-full cursor-pointer transition-colors"
+                                title={`Remover horário ${slot}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Add Slot Form */}
+                        <form onSubmit={handleAddSlot} className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-[#F0F0EE]">
+                          <div className="w-full sm:w-auto flex-1 flex items-center gap-2">
+                            <input
+                              type="time"
+                              value={newCustomSlot}
+                              onChange={(e) => setNewCustomSlot(e.target.value)}
+                              placeholder="HH:mm"
+                              className="px-3 py-2 rounded-xl border border-neutral-300 text-xs outline-none focus:border-[#1E3A47] w-full"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!newCustomSlot}
+                              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E3A47] hover:bg-[#162B34] text-white text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer shrink-0"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Adicionar Horário</span>
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-neutral-400 font-medium">Sugestões:</span>
+                            {['08:30', '13:00', '18:00'].map((suggested) => (
+                              !(availability.dailyTimeSlots || []).includes(suggested) && (
+                                <button
+                                  key={suggested}
+                                  type="button"
+                                  onClick={() => {
+                                    setNewCustomSlot(suggested);
+                                  }}
+                                  className="px-2 py-0.5 rounded bg-neutral-100 hover:bg-neutral-200 text-[10px] font-bold text-neutral-700 cursor-pointer"
+                                >
+                                  +{suggested}
+                                </button>
+                              )
+                            ))}
+                          </div>
+                        </form>
+                      </div>
+
+                    </div>
+
+                    {/* Right Column: Manual Block Engine & Summary */}
+                    <div className="lg:col-span-5 space-y-6">
+
+                      {/* CARD 3: BLOQUEIO MANUAL (FOLGAS / COMPROMISSOS EXTERNOS) */}
+                      <div className="bg-white p-5 sm:p-6 rounded-2xl border-2 border-amber-300/80 shadow-xs space-y-4">
+                        <div className="flex items-center gap-2 text-amber-900 pb-2 border-b border-amber-200">
+                          <Ban className="w-4 h-4 text-amber-600" />
+                          <h5 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
+                            3. Bloquear Horário ou Folga Manualmente
+                          </h5>
+                        </div>
+
+                        <p className="text-[11px] text-[#666666]">
+                          Bloqueie uma data inteira (folga/feriado) ou uma faixa específica (médico, compromisso).
+                          O horário bloqueado fica <strong>indisponível imediatamente</strong> no site.
+                        </p>
+
+                        <form onSubmit={handleAddBlock} className="space-y-3 text-xs">
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                              Data do Bloqueio *
+                            </label>
+                            <input
+                              type="date"
+                              required
+                              value={newBlockDate}
+                              onChange={(e) => setNewBlockDate(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:border-[#1E3A47] text-xs outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                              Horário a Bloquear *
+                            </label>
+                            <select
+                              value={newBlockTime}
+                              onChange={(e) => setNewBlockTime(e.target.value)}
+                              className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:border-[#1E3A47] text-xs outline-none bg-white font-medium"
+                            >
+                              <option value="ALL_DAY">🚫 Dia Todo (Bloquear todos os horários da data)</option>
+                              {(availability.dailyTimeSlots || []).map((t) => (
+                                <option key={t} value={t}>
+                                  ⏰ Apenas o horário das {t}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                              Motivo / Observação Interna (Opcional)
+                            </label>
+                            <input
+                              type="text"
+                              value={newBlockReason}
+                              onChange={(e) => setNewBlockReason(e.target.value)}
+                              placeholder="Ex: Folga, Médico, Reunião externa com parceiro..."
+                              className="w-full px-3 py-2 rounded-xl border border-neutral-300 focus:border-[#1E3A47] text-xs outline-none"
+                            />
+                          </div>
+
+                          <button
+                            type="submit"
+                            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                          >
+                            <Ban className="w-3.5 h-3.5" />
+                            <span>Confirmar Bloqueio Imediato</span>
+                          </button>
+                        </form>
+
+                        {/* List of active blocks */}
+                        <div className="pt-3 border-t border-neutral-200 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-600">
+                              Bloqueios Manuais Ativos ({availability.blockedSlots?.length || 0})
+                            </span>
+                          </div>
+
+                          {!availability.blockedSlots || availability.blockedSlots.length === 0 ? (
+                            <p className="text-[11px] text-neutral-400 italic py-2 text-center bg-neutral-50 rounded-xl">
+                              Nenhum bloqueio manual ativo. Todos os horários da sua grade semanal estão livres para clientes.
+                            </p>
+                          ) : (
+                            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                              {availability.blockedSlots.map((b) => (
+                                <div
+                                  key={b.id}
+                                  className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs flex items-center justify-between gap-2"
+                                >
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-amber-950">
+                                        {b.date.split('-').reverse().join('/')}
+                                      </span>
+                                      <span className="px-1.5 py-0.5 rounded bg-amber-200/80 text-[10px] font-extrabold text-amber-900">
+                                        {b.time ? `às ${b.time}` : 'Dia Todo'}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-800 line-clamp-1 mt-0.5">
+                                      {b.reason || 'Compromisso externo'}
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveBlock(b.id)}
+                                    className="px-2 py-1 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-[10px] font-bold transition-colors cursor-pointer shrink-0"
+                                    title="Desbloquear e liberar horário imediatamente para clientes"
+                                  >
+                                    Desbloquear
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* CARD 4: VISÃO GERAL DE HORÁRIOS OCUPADOS POR CLIENTES */}
+                      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E5E5E2] shadow-xs space-y-3">
+                        <div className="flex items-center justify-between pb-1 border-b border-[#F0F0EE]">
+                          <h5 className="text-xs font-bold uppercase tracking-wider text-[#1A1A1A]">
+                            Horários Ocupados por Reuniões
+                          </h5>
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                            {appointments.filter((a) => a.status !== 'cancelled').length} reuniões
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-[#666666]">
+                          Estes horários foram automaticamente bloqueados pelo sistema assim que os clientes concluíram o agendamento no site.
+                        </p>
+
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {appointments.filter((a) => a.status !== 'cancelled').length === 0 ? (
+                            <p className="text-[11px] text-neutral-400 italic py-2 text-center">
+                              Nenhuma reunião ocupando horários no momento.
+                            </p>
+                          ) : (
+                            appointments
+                              .filter((a) => a.status !== 'cancelled')
+                              .slice(0, 6)
+                              .map((a) => (
+                                <div
+                                  key={a.id}
+                                  className="p-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs flex items-center justify-between gap-2"
+                                >
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-bold text-[#1A1A1A]">
+                                        {a.date.split('-').reverse().join('/')} às {a.time}
+                                      </span>
+                                      <span className="text-[10px] font-medium text-neutral-500">
+                                        (45 min)
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] text-[#666666] truncate font-medium">
+                                      {a.clientName}
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedMeeting(a);
+                                      setActiveTab('agenda');
+                                    }}
+                                    className="text-[10px] font-bold text-[#1E3A47] hover:underline shrink-0"
+                                  >
+                                    Ver na Agenda &rarr;
+                                  </button>
+                                </div>
+                              ))
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: CONFIGURAÇÃO DE CONTATO & CANAIS */}
               {activeTab === 'config' && (
                 <div className="max-w-2xl bg-white p-6 rounded-2xl border border-[#E5E5E2] space-y-6 shadow-xs">
                   <div>
@@ -1535,29 +2066,41 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
                     <div>
                       <label className="block font-bold text-[#333333] mb-1">
-                        Número do WhatsApp (com DDI e DDD, apenas dígitos):
+                        Número do WhatsApp de Atendimento:
                       </label>
                       <div className="relative">
                         <Phone className="w-4 h-4 absolute left-3 top-2.5 text-[#888888]" />
                         <input
                           type="text"
                           required
-                          value={configForm.whatsappNumber}
+                          value={
+                            configForm.whatsappNumber.startsWith('55')
+                              ? formatWhatsAppDisplay(configForm.whatsappNumber)
+                              : maskPhone(configForm.whatsappNumber) || configForm.whatsappNumber
+                          }
                           onChange={(e) => {
                             const digits = e.target.value.replace(/\D/g, '');
-                            setConfigForm({ ...configForm, whatsappNumber: digits });
+                            // Store clean digits with 55 prefix if full Brazilian number
+                            let cleanStored = digits;
+                            if (digits.length === 11 && !digits.startsWith('55')) {
+                              cleanStored = `55${digits}`;
+                            } else if (digits.length === 13 && digits.startsWith('55')) {
+                              cleanStored = digits;
+                            }
+                            setConfigForm({ ...configForm, whatsappNumber: cleanStored });
                           }}
-                          placeholder="Ex: 5511986297916"
+                          placeholder="(11) 98629-7916"
+                          maxLength={19}
                           className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs font-mono"
                         />
                       </div>
                       <div className="flex items-center justify-between mt-1 text-[11px] text-[#888888]">
                         <span>
-                          Este é o número que recebe as mensagens do botão <strong>Vamos conversar?</strong> e formulários.
+                          Número com máscara organizada <strong>(XX) XXXXX-XXXX</strong> que recebe as mensagens do site.
                         </span>
                         {configForm.whatsappNumber && (
                           <span className="font-semibold text-[#1E3A47] bg-[#F2F2EE] px-2 py-0.5 rounded text-[10px]">
-                            Exibição: {formatWhatsAppDisplay(configForm.whatsappNumber)}
+                            Exibição no site: {formatWhatsAppDisplay(configForm.whatsappNumber)}
                           </span>
                         )}
                       </div>

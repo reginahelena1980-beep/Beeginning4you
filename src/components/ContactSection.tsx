@@ -13,6 +13,7 @@ import { ContactFormData } from '../types';
 import { saveDemandForm, getContactConfig, STORAGE_CHANGE_EVENT } from '../utils/adminStorage';
 import { useLanguage } from '../context/LanguageContext';
 import { TRANSLATIONS } from '../data/translations';
+import { maskPhoneOrEmail } from '../utils/phoneMask';
 
 interface ContactSectionProps {
   prefilledNeed?: string;
@@ -81,7 +82,11 @@ export default function ContactSection({
     e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'contactValue') {
+      setFormData((prev) => ({ ...prev, [name]: maskPhoneOrEmail(value) }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -400,7 +405,7 @@ export default function ContactSection({
                       required
                       value={formData.contactValue}
                       onChange={handleChange}
-                      placeholder={isEn ? "E.g.: +1 555-0199 or you@email.com" : "Ex: (11) 98765-4321 ou seu@email.com"}
+                      placeholder={isEn ? "E.g.: (11) 98765-4321 or you@email.com" : "Ex: (11) 98765-4321 ou seu@email.com"}
                       className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#D5D5D0] focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 text-xs sm:text-sm outline-none transition-all"
                     />
                   </div>
