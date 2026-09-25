@@ -7,8 +7,11 @@ import {
   isSlotBlocked,
   isSlotBooked,
   isSlotAvailable,
-  getAvailableSlotsForDate
+  getAvailableSlotsForDate,
+  notifyStorageChange,
+  updateDemandForm
 } from './adminStorage';
+import { saveAppointmentToFirestore } from '../firebase';
 
 export {
   isSlotBlocked,
@@ -81,9 +84,10 @@ export function saveAppointment(appointment: MeetingAppointment): MeetingAppoint
 
 export function cancelAppointmentInStorage(id: string): MeetingAppointment[] {
   const current = getSavedAppointments();
+  let modifiedItem: MeetingAppointment | null = null;
   const updated = current.map((item) => {
     if (item.id === id) {
-      return {
+      modifiedItem = {
         ...item,
         status: 'cancelled' as const,
         updatedAt: new Date().toISOString(),
@@ -95,10 +99,30 @@ export function cancelAppointmentInStorage(id: string): MeetingAppointment[] {
           }
         ]
       };
+      return modifiedItem;
     }
     return item;
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+  if (modifiedItem) {
+    saveAppointmentToFirestore(modifiedItem);
+    try {
+      fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointment: modifiedItem })
+      }).catch(() => {});
+    } catch {}
+
+    const demandId = `demand-from-${id}`;
+    updateDemandForm(demandId, {
+      status: 'Cancelado',
+      adminNotes: `Reunião cancelada em ${new Date().toLocaleString('pt-BR')}`
+    });
+  }
+
+  notifyStorageChange();
   return updated;
 }
 
@@ -108,11 +132,12 @@ export function rescheduleAppointmentInStorage(
   newTime: string
 ): MeetingAppointment[] {
   const current = getSavedAppointments();
+  let modifiedItem: MeetingAppointment | null = null;
   const updated = current.map((item) => {
     if (item.id === id) {
       const prevDate = item.date;
       const prevTime = item.time;
-      return {
+      modifiedItem = {
         ...item,
         date: newDate,
         time: newTime,
@@ -126,10 +151,30 @@ export function rescheduleAppointmentInStorage(
           }
         ]
       };
+      return modifiedItem;
     }
     return item;
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+  if (modifiedItem) {
+    saveAppointmentToFirestore(modifiedItem);
+    try {
+      fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointment: modifiedItem })
+      }).catch(() => {});
+    } catch {}
+
+    const demandId = `demand-from-${id}`;
+    updateDemandForm(demandId, {
+      status: 'Reagendado',
+      adminNotes: `Reunião reagendada para ${newDate.split('-').reverse().join('/')} às ${newTime}. Sala Meet: ${(modifiedItem as MeetingAppointment).meetLink}`
+    });
+  }
+
+  notifyStorageChange();
   return updated;
 }
 

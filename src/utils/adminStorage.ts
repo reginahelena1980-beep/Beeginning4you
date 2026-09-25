@@ -49,7 +49,7 @@ const FORMS_STORAGE_KEY = 'beeginning_demand_forms_v1';
 const MEETINGS_STORAGE_KEY = 'beeginning_scheduled_meetings_v1';
 export const STORAGE_CHANGE_EVENT = 'beeginning_storage_updated';
 
-function notifyStorageChange() {
+export function notifyStorageChange() {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(STORAGE_CHANGE_EVENT));
   }
