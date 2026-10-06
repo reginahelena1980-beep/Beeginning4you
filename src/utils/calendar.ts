@@ -65,65 +65,82 @@ export const FIXED_GOOGLE_MEET_URL = 'https://meet.google.com/fxx-ctnv-hgm';
 export const OFFICIAL_EMAIL = 'beeginning4you@gmail.com';
 export const OFFICIAL_WHATSAPP = '5511986297916';
 
-const STORAGE_KEY = 'beeginning_scheduled_meetings_v1';
-
 export function getSavedAppointments(): MeetingAppointment[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('Error loading appointments from localStorage', e);
-    return [];
-  }
+  return [];
 }
 
 export function saveAppointment(appointment: MeetingAppointment): MeetingAppointment[] {
-  return saveAppointmentWithDiagnostic(appointment);
+  // Criação pública de agendamento: persistir SOMENTE campos públicos permitidos, sem diagnosticNotes
+  const publicAppt: MeetingAppointment = {
+    id: appointment.id,
+    clientName: appointment.clientName,
+    clientEmail: appointment.clientEmail,
+    clientPhone: appointment.clientPhone,
+    topic: appointment.topic,
+    date: appointment.date,
+    time: appointment.time,
+    durationMinutes: appointment.durationMinutes || 45,
+    meetLink: appointment.meetLink || FIXED_GOOGLE_MEET_URL,
+    status: appointment.status || 'confirmed',
+    createdAt: appointment.createdAt || new Date().toISOString(),
+    confidentialityAccepted: Boolean(appointment.confidentialityAccepted),
+    history: appointment.history || []
+  };
+
+  // Salva no Firestore estritamente com campos públicos permitidos pelo firestore.rules
+  saveAppointmentToFirestore(publicAppt);
+
+  try {
+    fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appointment: publicAppt })
+    }).catch(() => {});
+  } catch {}
+
+  notifyStorageChange();
+  return [publicAppt];
 }
 
 export function cancelAppointmentInStorage(id: string): MeetingAppointment[] {
-  const current = getSavedAppointments();
-  let modifiedItem: MeetingAppointment | null = null;
-  const updated = current.map((item) => {
-    if (item.id === id) {
-      modifiedItem = {
-        ...item,
-        status: 'cancelled' as const,
-        updatedAt: new Date().toISOString(),
-        history: [
-          ...(item.history || []),
-          {
-            date: new Date().toISOString(),
-            action: 'Reunião cancelada pelo cliente'
-          }
-        ]
-      };
-      return modifiedItem;
-    }
-    return item;
+  const updated: MeetingAppointment = {
+    id,
+    clientName: '',
+    clientEmail: '',
+    clientPhone: '',
+    topic: '',
+    date: '',
+    time: '',
+    durationMinutes: 45,
+    meetLink: FIXED_GOOGLE_MEET_URL,
+    status: 'cancelled',
+    createdAt: new Date().toISOString(),
+    confidentialityAccepted: true,
+    history: [
+      {
+        date: new Date().toISOString(),
+        action: 'Reunião cancelada pelo cliente'
+      }
+    ]
+  };
+
+  saveAppointmentToFirestore(updated);
+  try {
+    fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appointment: updated })
+    }).catch(() => {});
+  } catch {}
+
+  const demandId = `demand-from-${id}`;
+  updateDemandForm(demandId, {
+    status: 'Cancelado',
+    adminNotes: `Reunião cancelada em ${new Date().toLocaleString('pt-BR')}`
   });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-
-  if (modifiedItem) {
-    saveAppointmentToFirestore(modifiedItem);
-    try {
-      fetch('/api/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appointment: modifiedItem })
-      }).catch(() => {});
-    } catch {}
-
-    const demandId = `demand-from-${id}`;
-    updateDemandForm(demandId, {
-      status: 'Cancelado',
-      adminNotes: `Reunião cancelada em ${new Date().toLocaleString('pt-BR')}`
-    });
-  }
 
   notifyStorageChange();
-  return updated;
+  return [updated];
 }
 
 export function rescheduleAppointmentInStorage(
@@ -131,51 +148,44 @@ export function rescheduleAppointmentInStorage(
   newDate: string,
   newTime: string
 ): MeetingAppointment[] {
-  const current = getSavedAppointments();
-  let modifiedItem: MeetingAppointment | null = null;
-  const updated = current.map((item) => {
-    if (item.id === id) {
-      const prevDate = item.date;
-      const prevTime = item.time;
-      modifiedItem = {
-        ...item,
-        date: newDate,
-        time: newTime,
-        status: 'rescheduled' as const,
-        updatedAt: new Date().toISOString(),
-        history: [
-          ...(item.history || []),
-          {
-            date: new Date().toISOString(),
-            action: `Reagendada de ${prevDate} ${prevTime} para ${newDate} ${newTime}`
-          }
-        ]
-      };
-      return modifiedItem;
-    }
-    return item;
+  const updated: MeetingAppointment = {
+    id,
+    clientName: '',
+    clientEmail: '',
+    clientPhone: '',
+    topic: '',
+    date: newDate,
+    time: newTime,
+    durationMinutes: 45,
+    meetLink: FIXED_GOOGLE_MEET_URL,
+    status: 'rescheduled',
+    createdAt: new Date().toISOString(),
+    confidentialityAccepted: true,
+    history: [
+      {
+        date: new Date().toISOString(),
+        action: `Reagendada para ${newDate} ${newTime}`
+      }
+    ]
+  };
+
+  saveAppointmentToFirestore(updated);
+  try {
+    fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appointment: updated })
+    }).catch(() => {});
+  } catch {}
+
+  const demandId = `demand-from-${id}`;
+  updateDemandForm(demandId, {
+    status: 'Reagendado',
+    adminNotes: `Reunião reagendada para ${newDate.split('-').reverse().join('/')} às ${newTime}`
   });
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-
-  if (modifiedItem) {
-    saveAppointmentToFirestore(modifiedItem);
-    try {
-      fetch('/api/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appointment: modifiedItem })
-      }).catch(() => {});
-    } catch {}
-
-    const demandId = `demand-from-${id}`;
-    updateDemandForm(demandId, {
-      status: 'Reagendado',
-      adminNotes: `Reunião reagendada para ${newDate.split('-').reverse().join('/')} às ${newTime}. Sala Meet: ${(modifiedItem as MeetingAppointment).meetLink}`
-    });
-  }
 
   notifyStorageChange();
-  return updated;
+  return [updated];
 }
 
 /**
@@ -283,22 +293,15 @@ export async function sendOfficialConfirmationEmail(
   `;
 
   try {
-    const config = getContactConfig();
-    const res = await fetch('/api/send-email', {
+    const res = await fetch('/api/appointments/resend-confirmation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: appointment.clientEmail,
-        subject,
-        text: body,
-        html: htmlBody,
-        appPassword: config.gmailAppPassword || undefined
-      })
+      body: JSON.stringify({ appointmentId: appointment.id })
     });
     const data = await res.json();
     return { success: !!data?.success, message: data?.message || data?.error };
   } catch (err: any) {
-    console.warn('[Email Dispatch] Falha ao acionar /api/send-email', err);
+    console.warn('[Email Dispatch] Falha ao acionar confirmação no servidor', err);
     return { success: false, message: err?.message };
   }
 }
@@ -312,55 +315,20 @@ export async function sendOfficialRescheduleEmail(
   prevTime?: string,
   isEn = false
 ): Promise<{ success: boolean; message?: string }> {
-  const newDateFormatted = appointment.date.split('-').reverse().join('/');
-  const prevDateFormatted = prevDate ? prevDate.split('-').reverse().join('/') : '';
-  
-  const subject = isEn
-    ? `Meeting Rescheduled: Beeginning 4 you (New time: ${newDateFormatted} at ${appointment.time})`
-    : `Reagendamento de Reunião: Beeginning 4 you (Novo horário: ${newDateFormatted} às ${appointment.time})`;
-  
-  const body = isEn
-    ? `Hello, ${appointment.clientName}!\n\n` +
-      `Your meeting with Beeginning 4 you (${OFFICIAL_EMAIL}) has been successfully rescheduled:\n\n` +
-      (prevDateFormatted ? `Previous time: ${prevDateFormatted} at ${prevTime}\n` : '') +
-      `📅 NEW DATE: ${newDateFormatted}\n` +
-      `⏰ NEW TIME: ${appointment.time} (Brasília Time / UTC-3)\n` +
-      `⏳ Duration: 45 minutes\n` +
-      `💻 Google Meet Room: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
-      `🔒 Confidentiality & Privacy Commitment:\n` +
-      `Your ideas and project information continue to be protected under absolute confidentiality and privacy terms.\n\n` +
-      `Best regards,\n` +
-      `Beeginning 4 you Team\n` +
-      `${OFFICIAL_EMAIL}`
-    : `Olá, ${appointment.clientName}!\n\n` +
-      `Confirmamos que a sua reunião com a Beeginning 4 you (${OFFICIAL_EMAIL}) foi reagendada com sucesso:\n\n` +
-      (prevDateFormatted ? `Horário anterior: ${prevDateFormatted} às ${prevTime}\n` : '') +
-      `📅 NOVA DATA: ${newDateFormatted}\n` +
-      `⏰ NOVO HORÁRIO: ${appointment.time} (Horário de Brasília)\n` +
-      `⏳ Duração: 45 minutos\n` +
-      `💻 Sala Virtual Google Meet: ${appointment.meetLink || FIXED_GOOGLE_MEET_URL}\n\n` +
-      `🔒 Compromisso de Sigilo e LGPD:\n` +
-      `Todas as informações e ideias compartilhadas permanecem sob absoluto sigilo comercial e em conformidade com a LGPD (Lei 13.709/2018).\n\n` +
-      `Atenciosamente,\n` +
-      `Equipe Beeginning 4 you\n` +
-      `${OFFICIAL_EMAIL}`;
-
   try {
-    const config = getContactConfig();
-    const res = await fetch('/api/send-email', {
+    const res = await fetch('/api/appointments/reschedule-notification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        to: appointment.clientEmail,
-        subject,
-        text: body,
-        appPassword: config.gmailAppPassword || undefined
+        appointmentId: appointment.id,
+        newDate: appointment.date,
+        newTime: appointment.time
       })
     });
     const data = await res.json();
     return { success: !!data?.success, message: data?.message || data?.error };
   } catch (err: any) {
-    console.warn('[Email Dispatch] Falha no backend /api/send-email', err);
+    console.warn('[Email Dispatch] Falha no backend ao notificar reagendamento', err);
     return { success: false, message: err?.message };
   }
 }
@@ -372,40 +340,16 @@ export async function sendOfficialCancellationEmail(
   appointment: MeetingAppointment,
   isEn = false
 ): Promise<{ success: boolean; message?: string }> {
-  const dateFormatted = appointment.date.split('-').reverse().join('/');
-  const subject = isEn
-    ? `Meeting Cancellation: Beeginning 4 you (${dateFormatted} at ${appointment.time})`
-    : `Cancelamento de Reunião: Beeginning 4 you (${dateFormatted} às ${appointment.time})`;
-  const body = isEn
-    ? `Hello, ${appointment.clientName}!\n\n` +
-      `This is a confirmation from Beeginning 4 you (${OFFICIAL_EMAIL}) that your meeting previously scheduled for ${dateFormatted} at ${appointment.time} has been cancelled.\n\n` +
-      `If you wish to reschedule or talk to us at a more convenient time, please feel free to book a new slot on our website or reach out via WhatsApp (${OFFICIAL_WHATSAPP}).\n\n` +
-      `Best regards,\n` +
-      `Beeginning 4 you Team\n` +
-      `${OFFICIAL_EMAIL}`
-    : `Olá, ${appointment.clientName}!\n\n` +
-      `Confirmamos que a sua reunião com a equipe da Beeginning 4 you (${OFFICIAL_EMAIL}), anteriormente agendada para ${dateFormatted} às ${appointment.time}, foi cancelada conforme solicitado.\n\n` +
-      `Caso queira reagendar no futuro ou prefira conversar via WhatsApp (${OFFICIAL_WHATSAPP}), estamos sempre à sua disposição.\n\n` +
-      `Atenciosamente,\n` +
-      `Equipe Beeginning 4 you\n` +
-      `${OFFICIAL_EMAIL}`;
-
   try {
-    const config = getContactConfig();
-    const res = await fetch('/api/send-email', {
+    const res = await fetch('/api/appointments/cancel-notification', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: appointment.clientEmail,
-        subject,
-        text: body,
-        appPassword: config.gmailAppPassword || undefined
-      })
+      body: JSON.stringify({ appointmentId: appointment.id })
     });
     const data = await res.json();
     return { success: !!data?.success, message: data?.message || data?.error };
   } catch (err: any) {
-    console.warn('[Email Dispatch] Falha no backend /api/send-email', err);
+    console.warn('[Email Dispatch] Falha no backend ao notificar cancelamento', err);
     return { success: false, message: err?.message };
   }
 }

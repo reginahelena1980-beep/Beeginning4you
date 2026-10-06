@@ -161,11 +161,9 @@ export interface ContactConfig {
   meetUrl: string;
   fixedMeetUrl?: string;
   businessHours: string;
-  adminPassword?: string;
-  adminPasswordHash: string; // Simple password comparison
   profilePhotoUrl?: string; // Custom profile photo for Regina
-  gmailAppPassword?: string; // Senha de Aplicativo do Gmail (16 caracteres) para disparo automático
-  whatsappGatewayUrl?: string; // URL do Gateway de WhatsApp para disparo direto (opcional)
-  whatsappGatewayToken?: string; // Token do Gateway de WhatsApp (opcional)
+  gmailAppPassword?: string; // Server credential (handled securely server-side)
+  whatsappGatewayUrl?: string; // Server credential (handled securely server-side)
+  whatsappGatewayToken?: string; // Server credential (handled securely server-side)
   availability?: AdminAvailabilityConfig; // Gestão de disponibilidade e bloqueios de horários
 }

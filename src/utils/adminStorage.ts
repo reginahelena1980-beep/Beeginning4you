@@ -35,12 +35,7 @@ export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
   meetUrl: 'https://meet.google.com/fxx-ctnv-hgm',
   fixedMeetUrl: 'https://meet.google.com/fxx-ctnv-hgm',
   businessHours: 'Segunda a Sexta das 08h30 às 18h30',
-  adminPassword: 'bee2026',
-  adminPasswordHash: 'bee2026',
   profilePhotoUrl: '',
-  gmailAppPassword: '',
-  whatsappGatewayUrl: '',
-  whatsappGatewayToken: '',
   availability: DEFAULT_AVAILABILITY_CONFIG
 };
 
@@ -49,6 +44,14 @@ const FORMS_STORAGE_KEY = 'beeginning_demand_forms_v1';
 const MEETINGS_STORAGE_KEY = 'beeginning_scheduled_meetings_v1';
 export const STORAGE_CHANGE_EVENT = 'beeginning_storage_updated';
 
+// In-memory CRM data storage (restricted to authenticated admin sessions only)
+let inMemoryDemands: DemandForm[] = [];
+let inMemoryAppointments: MeetingAppointment[] = [];
+let inMemoryBookedSlots: Array<{ date: string; time: string }> = [];
+
+let unsubscribeDemands: (() => void) | null = null;
+let unsubscribeAppointments: (() => void) | null = null;
+
 export function notifyStorageChange() {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(STORAGE_CHANGE_EVENT));
@@ -56,73 +59,61 @@ export function notifyStorageChange() {
 }
 
 /**
- * Filter out any mock/sample items that might linger in client's localStorage
- * from previous test sessions.
+ * Remove any sensitive CRM data lingering in client browser localStorage
+ * Ensures public visitors never keep other clients' information.
  */
-function isMockDemand(item: Partial<DemandForm>): boolean {
-  if (!item) return false;
-  const id = (item.id || '').toLowerCase();
-  const name = (item.name || '').toLowerCase();
-  return (
-    id.includes('sample') ||
-    id === 'form-sample-1' ||
-    id === 'form-sample-2' ||
-    id === 'demand-from-meet-sample-1' ||
-    name === 'mariana duarte' ||
-    name === 'carlos alberto lima'
-  );
-}
-
-function isMockMeeting(item: Partial<MeetingAppointment>): boolean {
-  if (!item) return false;
-  const id = (item.id || '').toLowerCase();
-  const name = (item.clientName || '').toLowerCase();
-  return (
-    id.includes('sample') ||
-    id === 'meet-sample-1' ||
-    name === 'carla vasconcelos'
-  );
-}
-
-function purgeLegacyMockData() {
+export function purgeSensitiveCrmFromLocalStorage() {
   if (typeof window === 'undefined') return;
   try {
+    localStorage.removeItem(FORMS_STORAGE_KEY);
+    localStorage.removeItem(MEETINGS_STORAGE_KEY);
+    
+    // Also clean up any lingering passwords from config in localStorage
     const configRaw = localStorage.getItem(CONFIG_STORAGE_KEY);
     if (configRaw) {
       const parsed = JSON.parse(configRaw);
+      delete parsed.adminPassword;
+      delete parsed.adminPasswordHash;
+      delete parsed.gmailAppPassword;
+      delete parsed.whatsappGatewayUrl;
+      delete parsed.whatsappGatewayToken;
       const sanitized = sanitizeContactConfig(parsed);
       localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
-    } else {
-      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(DEFAULT_CONTACT_CONFIG));
-    }
-
-    const formsRaw = localStorage.getItem(FORMS_STORAGE_KEY);
-    if (formsRaw) {
-      const parsed: DemandForm[] = JSON.parse(formsRaw);
-      const cleaned = parsed.filter((f) => !isMockDemand(f));
-      if (cleaned.length !== parsed.length) {
-        localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(cleaned));
-      }
-    }
-
-    const meetingsRaw = localStorage.getItem(MEETINGS_STORAGE_KEY);
-    if (meetingsRaw) {
-      const parsed: MeetingAppointment[] = JSON.parse(meetingsRaw);
-      const cleaned = parsed.filter((m) => !isMockMeeting(m));
-      if (cleaned.length !== parsed.length) {
-        localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(cleaned));
-      }
     }
   } catch (err) {
-    console.warn('Could not purge legacy mock data', err);
+    console.warn('[Security] Could not purge legacy sensitive storage', err);
   }
 }
 
-// Initialise Firebase real-time listeners, server API dual-sync, and direct initial fetch
-if (typeof window !== 'undefined') {
-  purgeLegacyMockData();
+/**
+ * Anonymized booked slots engine for public availability check
+ * Contains strictly { date, time } pairs with ZERO PII (no names, emails, phones or topics).
+ */
+export async function refreshBookedSlots(): Promise<Array<{ date: string; time: string }>> {
+  if (typeof window === 'undefined') return [];
+  try {
+    const res = await fetch('/api/booked-slots');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.bookedSlots)) {
+        inMemoryBookedSlots = data.bookedSlots;
+        notifyStorageChange();
+        return inMemoryBookedSlots;
+      }
+    }
+  } catch {}
+  return inMemoryBookedSlots;
+}
 
-  // 0. Immediate fetch from backend API (fast, reliable server persistence)
+export function getBookedSlots(): Array<{ date: string; time: string }> {
+  return inMemoryBookedSlots;
+}
+
+// Public Initialisation: Load public config and anonymized slot availability ONLY
+if (typeof window !== 'undefined') {
+  purgeSensitiveCrmFromLocalStorage();
+
+  // 1. Fetch sanitized public configuration from backend API
   fetch('/api/config')
     .then((r) => (r.ok ? r.json() : null))
     .then((data) => {
@@ -134,73 +125,16 @@ if (typeof window !== 'undefined') {
     })
     .catch(() => {});
 
-  fetch('/api/appointments')
-    .then((r) => (r.ok ? r.json() : null))
-    .then((data) => {
-      if (Array.isArray(data?.appointments)) {
-        const cleaned = data.appointments.filter((m: any) => !isMockMeeting(m));
-        localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(cleaned));
-        notifyStorageChange();
-      }
-    })
-    .catch(() => {});
-
-  fetch('/api/demands')
-    .then((r) => (r.ok ? r.json() : null))
-    .then((data) => {
-      if (Array.isArray(data?.demands)) {
-        const cleaned = data.demands.filter((f: any) => !isMockDemand(f));
-        localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(cleaned));
-        notifyStorageChange();
-      }
-    })
-    .catch(() => {});
-
-  // 1. One-off initial direct fetch to prime cache from live Firestore
+  // 2. Fetch public configuration from Firestore
   fetchContactConfigFromFirestore().then((remoteConfig) => {
     if (remoteConfig && Object.keys(remoteConfig).length > 0) {
-      // If remote has valid availability, adopt it
-      if (remoteConfig.availability && Object.keys(remoteConfig.availability).length > 0) {
-        const sanitized = sanitizeContactConfig(remoteConfig);
-        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
-        notifyStorageChange();
-      } else {
-        // Remote exists but lacks availability - if local has availability, upload local config to Firestore
-        const local = getContactConfig();
-        if (local?.availability && (local.availability.blockedSlots?.length || (local.availability.activeDaysOfWeek && local.availability.activeDaysOfWeek.length < 7))) {
-          saveContactConfigToFirestore(local);
-        } else {
-          const sanitized = sanitizeContactConfig(remoteConfig);
-          localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
-          notifyStorageChange();
-        }
-      }
-    } else {
-      // Firestore has no config yet - upload current local config
-      const local = getContactConfig();
-      if (local) {
-        saveContactConfigToFirestore(local);
-      }
-    }
-  }).catch(() => {});
-
-  fetchDemandsFromFirestore().then((remoteDemands) => {
-    if (Array.isArray(remoteDemands)) {
-      const cleaned = remoteDemands.filter((f) => !isMockDemand(f));
-      localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(cleaned));
+      const sanitized = sanitizeContactConfig(remoteConfig);
+      localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
       notifyStorageChange();
     }
   }).catch(() => {});
 
-  fetchAppointmentsFromFirestore().then((remoteAppointments) => {
-    if (Array.isArray(remoteAppointments)) {
-      const cleaned = remoteAppointments.filter((m) => !isMockMeeting(m));
-      localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(cleaned));
-      notifyStorageChange();
-    }
-  }).catch(() => {});
-
-  // 2. Continuous real-time Firestore listeners
+  // 3. Real-time listener for public contact configuration
   subscribeContactConfigFromFirestore((remoteConfig) => {
     if (remoteConfig && Object.keys(remoteConfig).length > 0) {
       const sanitized = sanitizeContactConfig(remoteConfig);
@@ -209,21 +143,100 @@ if (typeof window !== 'undefined') {
     }
   });
 
-  subscribeDemandsFromFirestore((remoteDemands) => {
-    if (Array.isArray(remoteDemands)) {
-      const cleaned = remoteDemands.filter((f) => !isMockDemand(f));
-      localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(cleaned));
-      notifyStorageChange();
-    }
-  });
+  // 4. Fetch anonymized booked slots for availability checking (NO CLIENT DATA)
+  refreshBookedSlots();
+}
 
-  subscribeAppointmentsFromFirestore((remoteAppointments) => {
-    if (Array.isArray(remoteAppointments)) {
-      const cleaned = remoteAppointments.filter((m) => !isMockMeeting(m));
-      localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(cleaned));
-      notifyStorageChange();
+/**
+ * Authenticated Admin CRM Loader
+ * Called ONLY when the administrator is authenticated via Firebase Authentication.
+ */
+export async function loadAdminCrmData(idToken?: string): Promise<{
+  demands: DemandForm[];
+  appointments: MeetingAppointment[];
+}> {
+  try {
+    const headers: Record<string, string> = {};
+    if (idToken) {
+      headers['Authorization'] = `Bearer ${idToken}`;
     }
-  });
+
+    // 1. Fetch from protected backend API if token is provided
+    if (idToken) {
+      try {
+        const [apptsRes, demandsRes] = await Promise.all([
+          fetch('/api/appointments', { headers }),
+          fetch('/api/demands', { headers })
+        ]);
+        if (apptsRes.ok) {
+          const apptsData = await apptsRes.json();
+          if (Array.isArray(apptsData?.appointments)) {
+            inMemoryAppointments = apptsData.appointments;
+          }
+        }
+        if (demandsRes.ok) {
+          const demandsData = await demandsRes.json();
+          if (Array.isArray(demandsData?.demands)) {
+            inMemoryDemands = demandsData.demands;
+          }
+        }
+      } catch (apiErr) {
+        console.warn('[Admin CRM] Fallback to direct Firestore fetch:', apiErr);
+      }
+    }
+
+    // 2. Direct Firestore fetch
+    const [remoteDemands, remoteAppointments] = await Promise.all([
+      fetchDemandsFromFirestore().catch(() => []),
+      fetchAppointmentsFromFirestore().catch(() => [])
+    ]);
+
+    if (Array.isArray(remoteDemands) && remoteDemands.length > 0) {
+      inMemoryDemands = remoteDemands;
+    }
+    if (Array.isArray(remoteAppointments) && remoteAppointments.length > 0) {
+      inMemoryAppointments = remoteAppointments;
+    }
+
+    // 3. Attach authenticated Firestore real-time listeners
+    if (unsubscribeDemands) unsubscribeDemands();
+    if (unsubscribeAppointments) unsubscribeAppointments();
+
+    unsubscribeDemands = subscribeDemandsFromFirestore((updatedDemands) => {
+      inMemoryDemands = updatedDemands;
+      notifyStorageChange();
+    });
+
+    unsubscribeAppointments = subscribeAppointmentsFromFirestore((updatedAppts) => {
+      inMemoryAppointments = updatedAppts;
+      notifyStorageChange();
+    });
+
+    notifyStorageChange();
+    return { demands: inMemoryDemands, appointments: inMemoryAppointments };
+  } catch (err) {
+    console.error('[Admin CRM] Error loading administrative CRM data:', err);
+    return { demands: [], appointments: [] };
+  }
+}
+
+/**
+ * Authenticated Admin CRM Cleanup
+ * Called when administrator logs out.
+ */
+export function clearAdminCrmData() {
+  if (unsubscribeDemands) {
+    unsubscribeDemands();
+    unsubscribeDemands = null;
+  }
+  if (unsubscribeAppointments) {
+    unsubscribeAppointments();
+    unsubscribeAppointments = null;
+  }
+  inMemoryDemands = [];
+  inMemoryAppointments = [];
+  purgeSensitiveCrmFromLocalStorage();
+  notifyStorageChange();
 }
 
 export function formatWhatsAppDisplay(raw: string): string {
@@ -255,10 +268,13 @@ export function sanitizeContactConfig(config: Partial<ContactConfig> | null | un
     ...(config || {}),
   };
 
+  // Strip any accidental password fields
+  delete (merged as any).adminPassword;
+  delete (merged as any).adminPasswordHash;
+
   const rawWa = (merged.whatsappNumber || '').replace(/\D/g, '');
   const rawDisplay = merged.whatsappDisplay || '';
 
-  // If number or display is placeholder or not containing official 98629
   if (!rawWa || rawWa.includes('99999') || rawDisplay.includes('99999') || rawWa === '5511987654321' || !rawWa.includes('98629')) {
     merged.whatsappNumber = '5511986297916';
     merged.whatsappDisplay = '(11) 98629-7916';
@@ -266,7 +282,6 @@ export function sanitizeContactConfig(config: Partial<ContactConfig> | null | un
     merged.whatsappDisplay = formatWhatsAppDisplay(merged.whatsappNumber);
   }
 
-  // Ensure official email if empty or old placeholder
   if (!merged.email || merged.email.includes('example.com') || merged.email === 'contato@beeginning4you.com.br') {
     merged.email = 'beeginning4you@gmail.com';
   }
@@ -278,7 +293,6 @@ export function sanitizeContactConfig(config: Partial<ContactConfig> | null | un
     merged.fixedMeetUrl = 'https://meet.google.com/fxx-ctnv-hgm';
   }
 
-  // Sanitize Availability configuration
   const rawAvail = config?.availability || merged.availability;
   const sanitizedAvailability: AdminAvailabilityConfig = {
     activeDaysOfWeek: Array.isArray(rawAvail?.activeDaysOfWeek) && rawAvail.activeDaysOfWeek.length > 0
@@ -304,12 +318,6 @@ export function getContactConfig(): ContactConfig {
     if (!raw) return DEFAULT_CONTACT_CONFIG;
     const parsed = JSON.parse(raw);
     const sanitized = sanitizeContactConfig(parsed);
-    // If sanitized differs in display or number, persist it
-    if (sanitized.whatsappDisplay !== parsed.whatsappDisplay || sanitized.whatsappNumber !== parsed.whatsappNumber || sanitized.email !== parsed.email) {
-      try {
-        localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
-      } catch {}
-    }
     return sanitized;
   } catch (e) {
     console.error('Error loading contact config', e);
@@ -317,7 +325,7 @@ export function getContactConfig(): ContactConfig {
   }
 }
 
-export function saveContactConfig(config: ContactConfig): ContactConfig {
+export function saveContactConfig(config: ContactConfig, idToken?: string): ContactConfig {
   try {
     let cleanWa = (config.whatsappNumber || '').replace(/\D/g, '');
     if (cleanWa.length === 11 && !cleanWa.startsWith('55')) {
@@ -334,7 +342,10 @@ export function saveContactConfig(config: ContactConfig): ContactConfig {
     try {
       fetch('/api/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+        },
         body: JSON.stringify({ config: updated })
       }).catch(() => {});
     } catch {}
@@ -354,7 +365,7 @@ export function getAvailabilityConfig(): AdminAvailabilityConfig {
   return config.availability || DEFAULT_AVAILABILITY_CONFIG;
 }
 
-export function saveAvailabilityConfig(avail: Partial<AdminAvailabilityConfig>): AdminAvailabilityConfig {
+export function saveAvailabilityConfig(avail: Partial<AdminAvailabilityConfig>, idToken?: string): AdminAvailabilityConfig {
   const curConfig = getContactConfig();
   const currentAvail = curConfig.availability || DEFAULT_AVAILABILITY_CONFIG;
   const updatedAvail: AdminAvailabilityConfig = {
@@ -366,11 +377,11 @@ export function saveAvailabilityConfig(avail: Partial<AdminAvailabilityConfig>):
     ...curConfig,
     availability: updatedAvail
   };
-  saveContactConfig(updatedConfig);
+  saveContactConfig(updatedConfig, idToken);
   return updatedAvail;
 }
 
-export function addBlockedSlot(block: { date: string; time?: string; reason?: string }): BlockedSlot {
+export function addBlockedSlot(block: { date: string; time?: string; reason?: string }, idToken?: string): BlockedSlot {
   const currentAvail = getAvailabilityConfig();
   const newBlock: BlockedSlot = {
     id: `block-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -380,14 +391,14 @@ export function addBlockedSlot(block: { date: string; time?: string; reason?: st
     createdAt: new Date().toISOString()
   };
   const updatedBlocked = [newBlock, ...(currentAvail.blockedSlots || [])];
-  saveAvailabilityConfig({ blockedSlots: updatedBlocked });
+  saveAvailabilityConfig({ blockedSlots: updatedBlocked }, idToken);
   return newBlock;
 }
 
-export function removeBlockedSlot(blockId: string): void {
+export function removeBlockedSlot(blockId: string, idToken?: string): void {
   const currentAvail = getAvailabilityConfig();
   const updatedBlocked = (currentAvail.blockedSlots || []).filter((b) => b.id !== blockId);
-  saveAvailabilityConfig({ blockedSlots: updatedBlocked });
+  saveAvailabilityConfig({ blockedSlots: updatedBlocked }, idToken);
 }
 
 export function isDateBlocked(dateStr: string): boolean {
@@ -404,14 +415,23 @@ export function isSlotBlocked(dateStr: string, timeStr: string): boolean {
   );
 }
 
+/**
+ * Privacy-safe booked slot checker:
+ * In authenticated admin view: checks inMemoryAppointments.
+ * In public visitor view: checks inMemoryBookedSlots (which contains only { date, time } with zero PII).
+ */
 export function isSlotBooked(dateStr: string, timeStr: string, excludeAppointmentId?: string): boolean {
-  const appointments = getAdminAppointments();
-  return appointments.some(
-    (a) =>
-      a.id !== excludeAppointmentId &&
-      a.date === dateStr &&
-      a.time === timeStr &&
-      a.status !== 'cancelled'
+  if (inMemoryAppointments.length > 0) {
+    return inMemoryAppointments.some(
+      (a) =>
+        a.id !== excludeAppointmentId &&
+        a.date === dateStr &&
+        a.time === timeStr &&
+        a.status !== 'cancelled'
+    );
+  }
+  return inMemoryBookedSlots.some(
+    (slot) => slot.date === dateStr && slot.time === timeStr
   );
 }
 
@@ -465,70 +485,10 @@ export function getAvailableSlotsForDate(
 }
 
 // ========================
-// 2. Forms & Demands Database (Clean, Dynamic from Firestore)
+// 2. Forms & Demands Database
 // ========================
 export function getDemandForms(): DemandForm[] {
-  try {
-    const raw = localStorage.getItem(FORMS_STORAGE_KEY);
-    let forms: DemandForm[] = raw ? JSON.parse(raw) : [];
-
-    // Filter out any mock entries
-    forms = forms.filter((f) => !isMockDemand(f));
-
-    // Check if there are scheduled meetings not yet in forms
-    const meetingsRaw = localStorage.getItem(MEETINGS_STORAGE_KEY);
-    if (meetingsRaw) {
-      const meetings: MeetingAppointment[] = JSON.parse(meetingsRaw).filter(
-        (m: MeetingAppointment) => !isMockMeeting(m)
-      );
-      let added = false;
-      meetings.forEach((m) => {
-        const demandId = `demand-from-${m.id}`;
-        const hasForm = forms.some(
-          (f) => f.id === demandId || (f.name === m.clientName && f.createdAt === m.createdAt)
-        );
-        if (!hasForm) {
-          const diag = m.diagnosticNotes;
-          forms.unshift({
-            id: demandId,
-            createdAt: m.createdAt || new Date().toISOString(),
-            name: m.clientName,
-            phone: m.clientPhone,
-            email: m.clientEmail,
-            contactMethod: m.clientPhone ? 'whatsapp' : 'email',
-            contactValue: m.clientPhone || m.clientEmail,
-            businessDescription:
-              diag?.currentChallenges ||
-              `[Reunião agendada: ${m.date.split('-').reverse().join('/')} às ${m.time}] ${m.topic || 'Discussão de projeto'}`,
-            biggestNeed: m.topic || 'Discussão inicial de projeto sob medida',
-            source: 'agendamento',
-            origin: 'meeting_booking',
-            status:
-              m.status === 'confirmed'
-                ? 'Reunião Agendada'
-                : m.status === 'cancelled'
-                ? 'Cancelado'
-                : 'Novo',
-            businessName: '',
-            segment: diag?.businessSegment || '',
-            projectStage: 'Reunião agendada via plataforma',
-            adminNotes: diag?.recommendedSolution
-              ? `Solução: ${diag.recommendedSolution} | Orçamento: ${diag.estimatedBudget || 'A definir'}`
-              : `Reunião agendada para ${m.date} às ${m.time}. Meet: ${m.meetLink}`
-          });
-          added = true;
-        }
-      });
-      if (added) {
-        localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(forms));
-      }
-    }
-
-    return forms;
-  } catch (e) {
-    console.error('Error loading demand forms', e);
-    return [];
-  }
+  return inMemoryDemands;
 }
 
 export const getAllDemandForms = getDemandForms;
@@ -536,7 +496,6 @@ export const getAllDemandForms = getDemandForms;
 export function saveDemandForm(
   formData: Partial<DemandForm> & { name: string }
 ): DemandForm {
-  const forms = getDemandForms();
   const newForm: DemandForm = {
     contactMethod: 'whatsapp',
     contactValue: '',
@@ -547,8 +506,11 @@ export function saveDemandForm(
     status: formData.status || 'Novo'
   };
 
-  const updated = [newForm, ...forms.filter((f) => f.id !== newForm.id)];
-  localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(updated));
+  // If in admin session, keep in-memory demands updated
+  if (inMemoryDemands.length > 0) {
+    inMemoryDemands = [newForm, ...inMemoryDemands.filter((f) => f.id !== newForm.id)];
+  }
+
   saveDemandToFirestore(newForm);
   try {
     fetch('/api/demands', {
@@ -565,68 +527,39 @@ export function updateDemandForm(
   id: string,
   updates: Partial<DemandForm>
 ): DemandForm[] {
-  const forms = getDemandForms();
   let modifiedItem: DemandForm | null = null;
-  const updated = forms.map((item) => {
+  inMemoryDemands = inMemoryDemands.map((item) => {
     if (item.id === id) {
       modifiedItem = { ...item, ...updates };
       return modifiedItem;
     }
     return item;
   });
-  localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(updated));
   if (modifiedItem) {
     saveDemandToFirestore(modifiedItem);
   }
   notifyStorageChange();
-  return updated;
+  return inMemoryDemands;
 }
 
 export function deleteDemandForm(id: string): DemandForm[] {
-  const forms = getDemandForms();
-  const updated = forms.filter((item) => item.id !== id);
-  localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(updated));
+  inMemoryDemands = inMemoryDemands.filter((item) => item.id !== id);
   deleteDemandFromFirestore(id);
   notifyStorageChange();
-  return updated;
+  return inMemoryDemands;
 }
 
 // ========================
-// 3. Appointments & Integrated Meeting Forms (Clean, Dynamic from Firestore)
+// 3. Appointments & Integrated Meeting Forms
 // ========================
 export function getAdminAppointments(): MeetingAppointment[] {
-  try {
-    const raw = localStorage.getItem(MEETINGS_STORAGE_KEY);
-    if (!raw) return [];
-
-    const parsed: MeetingAppointment[] = JSON.parse(raw);
-    const cleaned = parsed.filter((m) => !isMockMeeting(m));
-
-    let changed = false;
-    const sanitized = cleaned.map((m) => {
-      if (!m.meetLink || m.meetLink.includes('beg-4you-meet')) {
-        changed = true;
-        return { ...m, meetLink: 'https://meet.google.com/fxx-ctnv-hgm' };
-      }
-      return m;
-    });
-
-    if (changed || sanitized.length !== parsed.length) {
-      localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(sanitized));
-    }
-    return sanitized;
-  } catch (e) {
-    console.error('Error loading appointments', e);
-    return [];
-  }
+  return inMemoryAppointments;
 }
 
 export function saveAppointmentWithDiagnostic(
   appointment: MeetingAppointment
 ): MeetingAppointment[] {
-  const current = getAdminAppointments();
-  const existingIdx = current.findIndex((m) => m.id === appointment.id);
-  let updated: MeetingAppointment[];
+  const existingIdx = inMemoryAppointments.findIndex((m) => m.id === appointment.id);
 
   const diag = appointment.diagnosticNotes || {
     problemDescription: appointment.topic || 'Necessidade inicial levantada no agendamento',
@@ -647,72 +580,22 @@ export function saveAppointmentWithDiagnostic(
     diagnosticNotes: diag
   };
 
-  if (existingIdx >= 0) {
-    updated = [...current];
-    updated[existingIdx] = withDiagnostic;
-  } else {
-    updated = [withDiagnostic, ...current];
+  if (inMemoryAppointments.length > 0) {
+    if (existingIdx >= 0) {
+      inMemoryAppointments[existingIdx] = withDiagnostic;
+    } else {
+      inMemoryAppointments.unshift(withDiagnostic);
+    }
   }
 
-  // Synchronize with Demand Forms database
-  const demandId = `demand-from-${appointment.id}`;
-  const forms = getDemandForms();
-  const existingDemand = forms.find((f) => f.id === demandId);
-
-  const statusLabel =
-    appointment.status === 'cancelled'
-      ? 'Cancelado'
-      : diag.opportunityStatus === 'fechado'
-      ? 'Concluído'
-      : diag.opportunityStatus === 'proposta_enviada'
-      ? 'Proposta Enviada'
-      : diag.opportunityStatus === 'proposta_elaboracao'
-      ? 'Proposta em Elaboração'
-      : diag.opportunityStatus === 'reuniao_realizada'
-      ? 'Reunião Realizada'
-      : 'Reunião Agendada';
-
-  const notesParts = [
-    `Reunião: ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}`,
-    diag.recommendedSolution ? `Solução: ${diag.recommendedSolution}` : '',
-    diag.estimatedBudget ? `Orçamento: ${diag.estimatedBudget}` : '',
-    diag.nextSteps ? `Próximos passos: ${diag.nextSteps}` : '',
-    diag.meetingSummary ? `Anotações: ${diag.meetingSummary}` : ''
-  ].filter(Boolean).join(' | ');
-
-  if (existingDemand) {
-    updateDemandForm(demandId, {
-      name: appointment.clientName,
-      phone: appointment.clientPhone,
-      email: appointment.clientEmail,
-      contactValue: appointment.clientPhone || appointment.clientEmail,
-      businessDescription: diag.currentChallenges || diag.problemDescription || appointment.topic,
-      biggestNeed: appointment.topic || existingDemand.biggestNeed,
-      status: statusLabel,
-      adminNotes: notesParts || existingDemand.adminNotes,
-      origin: 'meeting_booking'
-    });
-  } else {
-    saveDemandForm({
-      id: demandId,
-      name: appointment.clientName,
-      phone: appointment.clientPhone,
-      email: appointment.clientEmail,
-      contactMethod: appointment.clientPhone ? 'whatsapp' : 'email',
-      contactValue: appointment.clientPhone || appointment.clientEmail,
-      businessDescription: diag.currentChallenges || `[Reunião: ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}] ${appointment.topic || 'Discussão de projeto'}`,
-      biggestNeed: `[Reunião: ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}] ${appointment.topic || 'Discussão inicial de projeto'}`,
-      source: 'agendamento',
-      origin: 'meeting_booking',
-      status: statusLabel,
-      businessName: '',
-      segment: diag.businessSegment || '',
-      projectStage: 'Reunião agendada via plataforma',
-      adminNotes: notesParts || `Reunião agendada para ${appointment.date} às ${appointment.time}. Sala Meet: ${appointment.meetLink}`
-    });
+  // Update privacy-safe inMemoryBookedSlots immediately
+  if (withDiagnostic.status !== 'cancelled' && withDiagnostic.date && withDiagnostic.time) {
+    const exists = inMemoryBookedSlots.some((s) => s.date === withDiagnostic.date && s.time === withDiagnostic.time);
+    if (!exists) {
+      inMemoryBookedSlots.push({ date: withDiagnostic.date, time: withDiagnostic.time });
+    }
   }
 
-  localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(updated));
   saveAppointmentToFirestore(withDiagnostic);
   try {
     fetch('/api/appointments', {
@@ -721,8 +604,9 @@ export function saveAppointmentWithDiagnostic(
       body: JSON.stringify({ appointment: withDiagnostic })
     }).catch(() => {});
   } catch {}
+
   notifyStorageChange();
-  return updated;
+  return inMemoryAppointments;
 }
 
 export function updateMeetingDiagnostic(
@@ -730,9 +614,8 @@ export function updateMeetingDiagnostic(
   diagnosticData: Partial<MeetingDiagnosticData>,
   appointmentUpdates?: Partial<MeetingAppointment>
 ): MeetingAppointment[] {
-  const current = getAdminAppointments();
   let modifiedAppt: MeetingAppointment | null = null;
-  const updated = current.map((item) => {
+  inMemoryAppointments = inMemoryAppointments.map((item) => {
     if (item.id === meetingId) {
       modifiedAppt = {
         ...item,
@@ -749,11 +632,8 @@ export function updateMeetingDiagnostic(
     return item;
   });
 
-  localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(updated));
   if (modifiedAppt) {
     saveAppointmentToFirestore(modifiedAppt);
-
-    // Also synchronize updated notes to the corresponding demand in Firestore
     const demandId = `demand-from-${meetingId}`;
     const diag = (modifiedAppt as MeetingAppointment).diagnosticNotes;
     const statusLabel =
@@ -784,22 +664,14 @@ export function updateMeetingDiagnostic(
     });
   }
   notifyStorageChange();
-  return updated;
+  return inMemoryAppointments;
 }
 
 export function deleteAppointmentInStorage(id: string): MeetingAppointment[] {
-  const current = getAdminAppointments();
-  const updated = current.filter((m) => m.id !== id);
-  localStorage.setItem(MEETINGS_STORAGE_KEY, JSON.stringify(updated));
+  inMemoryAppointments = inMemoryAppointments.filter((m) => m.id !== id);
   deleteAppointmentFromFirestore(id);
-
-  // Also remove corresponding demand if it exists
   const demandId = `demand-from-${id}`;
-  const forms = getDemandForms();
-  const remainingForms = forms.filter((f) => f.id !== demandId);
-  localStorage.setItem(FORMS_STORAGE_KEY, JSON.stringify(remainingForms));
-  deleteDemandFromFirestore(demandId);
-
+  deleteDemandForm(demandId);
   notifyStorageChange();
-  return updated;
+  return inMemoryAppointments;
 }

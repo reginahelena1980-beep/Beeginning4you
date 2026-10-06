@@ -12,8 +12,6 @@
         "meetUrl": { "type": "string" },
         "fixedMeetUrl": { "type": "string" },
         "businessHours": { "type": "string" },
-        "adminPassword": { "type": "string" },
-        "adminPasswordHash": { "type": "string" },
         "profilePhotoUrl": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
@@ -39,6 +37,9 @@
         "origin": { "type": "string" },
         "status": { "type": "string" },
         "adminNotes": { "type": "string" },
+        "mainGoal": { "type": "string" },
+        "urgency": { "type": "string" },
+        "notes": { "type": "string" },
         "createdAt": { "type": "string" },
         "syncedAt": { "type": "string" }
       },
@@ -63,6 +64,7 @@
         "updatedAt": { "type": "string" },
         "confidentialityAccepted": { "type": "boolean" },
         "diagnosticNotes": { "type": "object" },
+        "history": { "type": "array" },
         "syncedAt": { "type": "string" }
       },
       "required": ["clientName", "date", "time"]

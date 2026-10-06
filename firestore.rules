@@ -3,24 +3,104 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Configurações globais do site, WhatsApp oficial, sala Google Meet e Disponibilidade de Horários
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        request.auth.token.email == 'beeginning4you@gmail.com' &&
+        request.auth.token.email_verified == true;
+    }
+
+    // Validação estrita para criação pública de demandas (visitantes não autenticados)
+    function isPublicValidDemand() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['name']) &&
+        data.keys().hasOnly([
+          'id', 'name', 'businessName', 'segment',
+          'contactMethod', 'contactValue', 'phone', 'email',
+          'biggestNeed', 'businessDescription', 'projectStage',
+          'source', 'origin', 'status', 'createdAt', 'syncedAt',
+          'mainGoal', 'urgency', 'notes'
+        ]) &&
+        !('adminNotes' in data) &&
+        data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+        (!('contactMethod' in data) || (data.contactMethod is string && data.contactMethod.size() <= 50)) &&
+        (!('contactValue' in data) || (data.contactValue is string && data.contactValue.size() <= 200)) &&
+        (!('biggestNeed' in data) || (data.biggestNeed is string && data.biggestNeed.size() <= 3000)) &&
+        (!('businessName' in data) || (data.businessName is string && data.businessName.size() <= 200)) &&
+        (!('businessDescription' in data) || (data.businessDescription is string && data.businessDescription.size() <= 3000)) &&
+        (!('segment' in data) || (data.segment is string && data.segment.size() <= 100)) &&
+        (!('projectStage' in data) || (data.projectStage is string && data.projectStage.size() <= 100)) &&
+        (!('source' in data) || (data.source is string && data.source.size() <= 100)) &&
+        (!('origin' in data) || (data.origin is string && data.origin.size() <= 100)) &&
+        (!('mainGoal' in data) || (data.mainGoal is string && data.mainGoal.size() <= 200)) &&
+        (!('urgency' in data) || (data.urgency is string && data.urgency.size() <= 50)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 3000)) &&
+        (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100)) &&
+        (!('syncedAt' in data) || (data.syncedAt is string && data.syncedAt.size() <= 100));
+    }
+
+    // Validação estrita para criação pública de agendamentos (visitantes não autenticados)
+    function isPublicValidAppointment() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['clientName', 'date', 'time']) &&
+        data.keys().hasOnly([
+          'id', 'clientName', 'clientEmail', 'clientPhone',
+          'topic', 'date', 'time', 'durationMinutes', 'meetLink',
+          'status', 'createdAt', 'confidentialityAccepted', 'history', 'syncedAt'
+        ]) &&
+        !('diagnosticNotes' in data) &&
+        !('adminNotes' in data) &&
+        data.clientName is string && data.clientName.size() > 0 && data.clientName.size() <= 200 &&
+        data.date is string && data.date.size() <= 50 &&
+        data.time is string && data.time.size() <= 50 &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('clientEmail' in data) || (data.clientEmail is string && data.clientEmail.size() <= 200)) &&
+        (!('clientPhone' in data) || (data.clientPhone is string && data.clientPhone.size() <= 50)) &&
+        (!('topic' in data) || (data.topic is string && data.topic.size() <= 1000)) &&
+        (!('durationMinutes' in data) || (data.durationMinutes is number)) &&
+        (!('meetLink' in data) || (data.meetLink is string && data.meetLink.size() <= 500)) &&
+        (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100)) &&
+        (!('syncedAt' in data) || (data.syncedAt is string && data.syncedAt.size() <= 100)) &&
+        (!('confidentialityAccepted' in data) || (data.confidentialityAccepted is bool)) &&
+        (!('history' in data) || (data.history is list));
+    }
+
+    // Configurações globais do site (leitura pública, escrita restrita ao administrador)
     match /settings/{settingId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // Demandas, formulários de contato e diagnósticos enviados pelos clientes
+    // Demandas e formulários de contato (visitantes criam com campos permitidos; leitura e gestão restritas ao administrador)
     match /demands/{demandId} {
-      allow read, write: if true;
+      allow create: if isAdmin() || isPublicValidDemand();
+      allow read, update, delete: if isAdmin();
     }
 
-    // Agendamentos de reuniões Google Meet e notas integradas
+    // Agendamentos de reuniões Google Meet (visitantes criam com campos permitidos; leitura e gestão restritas ao administrador)
     match /appointments/{appointmentId} {
-      allow read, write: if true;
+      allow create: if isAdmin() || isPublicValidAppointment();
+      allow read, update, delete: if isAdmin();
     }
 
-    // Bloqueio padrão para todas as outras coleções não autorizadas
+    // Registro de administradores autenticados (acesso restrito exclusivamente ao administrador oficial)
+    match /admins/{adminId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Bloqueio padrão absoluto para todas as outras coleções não autorizadas
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
+

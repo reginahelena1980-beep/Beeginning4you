@@ -36,7 +36,8 @@ import {
   Copy,
   ShieldAlert,
   CloudUpload,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 import reginaDefaultPhoto from '../assets/images/regina_portrait_1790082408093.jpg';
 import {
@@ -48,7 +49,8 @@ import {
   BlockedSlot
 } from '../types';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, uploadProfilePhotoToStorage, fetchContactConfigFromFirestore, saveContactConfigToFirestore } from '../firebase';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { db, auth, uploadProfilePhotoToStorage, fetchContactConfigFromFirestore, saveContactConfigToFirestore } from '../firebase';
 import { compressImageFile, normalizeImageUrl } from '../utils/imageUtils';
 import { maskPhone } from '../utils/phoneMask';
 import {
@@ -66,7 +68,9 @@ import {
   addBlockedSlot,
   removeBlockedSlot,
   DEFAULT_AVAILABILITY_CONFIG,
-  STORAGE_CHANGE_EVENT
+  STORAGE_CHANGE_EVENT,
+  loadAdminCrmData,
+  clearAdminCrmData
 } from '../utils/adminStorage';
 import { generateGoogleCalendarUrl } from '../utils/calendar';
 interface AdminModalProps {
@@ -76,12 +80,15 @@ interface AdminModalProps {
 
 export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [adminUser, setAdminUser] = useState<FirebaseUser | null>(null);
+  const [adminIdToken, setAdminIdToken] = useState<string>('');
+  const [emailInput, setEmailInput] = useState<string>('beeginning4you@gmail.com');
   const [passwordInput, setPasswordInput] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<'agenda' | 'demandas' | 'disponibilidade' | 'config'>('agenda');
-  const [showConfigPassword, setShowConfigPassword] = useState<boolean>(false);
 
   // Admin Data state
   const [config, setConfig] = useState<ContactConfig>(getContactConfig());
@@ -176,6 +183,51 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     }
   }, [isOpen]);
 
+  const OFFICIAL_ADMIN_EMAIL = 'beeginning4you@gmail.com';
+
+  // Firebase Authentication State Observer (Restrito estritamente ao Administrador Oficial)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Bloqueio rigoroso: Apenas a conta oficial do administrador pode desbloquear a UI administrativa
+        const isOfficialAdmin = user.email && user.email.toLowerCase() === OFFICIAL_ADMIN_EMAIL.toLowerCase();
+        if (!isOfficialAdmin) {
+          console.warn('[Admin Auth] Usuário não autorizado detectado na sessão Firebase:', user.email);
+          await signOut(auth);
+          setAdminUser(null);
+          setIsAuthenticated(false);
+          setAdminIdToken('');
+          clearAdminCrmData();
+          setDemands([]);
+          setAppointments([]);
+          setLoginError('Acesso não autorizado. Apenas o administrador oficial (beeginning4you@gmail.com) tem permissão de acesso ao painel.');
+          return;
+        }
+
+        setAdminUser(user);
+        setIsAuthenticated(true);
+        setLoginError('');
+        try {
+          const token = await user.getIdToken();
+          setAdminIdToken(token);
+          const { demands: d, appointments: a } = await loadAdminCrmData(token);
+          setDemands(d);
+          setAppointments(a);
+        } catch (err) {
+          console.warn('[Admin Auth] Notice while retrieving ID token:', err);
+        }
+      } else {
+        setAdminUser(null);
+        setIsAuthenticated(false);
+        setAdminIdToken('');
+        clearAdminCrmData();
+        setDemands([]);
+        setAppointments([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     window.addEventListener(STORAGE_CHANGE_EVENT, loadData);
     return () => window.removeEventListener(STORAGE_CHANGE_EVENT, loadData);
@@ -239,36 +291,74 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
   if (!isOpen) return null;
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput.trim() === config.adminPassword) {
+    setIsLoggingIn(true);
+    setLoginError('');
+    try {
+      const emailToAuth = emailInput.trim().toLowerCase();
+      if (emailToAuth !== OFFICIAL_ADMIN_EMAIL.toLowerCase()) {
+        setLoginError('Acesso negado. Apenas o e-mail oficial (beeginning4you@gmail.com) é autorizado como administrador.');
+        setIsLoggingIn(false);
+        return;
+      }
+      const userCredential = await signInWithEmailAndPassword(auth, emailToAuth, passwordInput);
+      if (userCredential.user.email?.toLowerCase() !== OFFICIAL_ADMIN_EMAIL.toLowerCase()) {
+        await signOut(auth);
+        setLoginError('Acesso negado. Apenas o administrador oficial autorizado tem permissão para acessar este painel.');
+        setIsLoggingIn(false);
+        return;
+      }
+      const token = await userCredential.user.getIdToken();
+      setAdminUser(userCredential.user);
+      setAdminIdToken(token);
       setIsAuthenticated(true);
-      setLoginError('');
       setPasswordInput('');
-    } else {
-      setLoginError('Senha incorreta. A senha padrão de fábrica é: bee2026');
+      const { demands: d, appointments: a } = await loadAdminCrmData(token);
+      setDemands(d);
+      setAppointments(a);
+    } catch (err: any) {
+      console.warn('[Admin Auth] Falha ao autenticar:', err?.code);
+      if (
+        err?.code === 'auth/invalid-credential' ||
+        err?.code === 'auth/wrong-password' ||
+        err?.code === 'auth/user-not-found'
+      ) {
+        setLoginError('Credenciais incorretas. Verifique o e-mail e a senha do administrador cadastrado no Firebase Console.');
+      } else if (err?.code === 'auth/too-many-requests') {
+        setLoginError('Muitas tentativas malsucedidas. Aguarde alguns minutos ou redefina a senha no Firebase Console.');
+      } else {
+        setLoginError(err?.message || 'Erro ao realizar login administrativo com Firebase Auth.');
+      }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
-  const handleResetToDefaultPassword = () => {
-    const cur = getContactConfig();
-    const resetConfig = { ...cur, adminPassword: 'bee2026' };
-    saveContactConfig(resetConfig);
-    setConfig(resetConfig);
-    setConfigForm(resetConfig);
-    setPasswordInput('bee2026');
-    setLoginError('');
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch {}
+    clearAdminCrmData();
+    setIsAuthenticated(false);
+    setAdminUser(null);
+    setAdminIdToken('');
+    setAppointments([]);
+    setDemands([]);
   };
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveContactConfig(configForm);
+    saveContactConfig(configForm, adminIdToken);
     setConfig(configForm);
 
     try {
       await fetch('/api/admin/save-server-config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminIdToken ? { 'Authorization': `Bearer ${adminIdToken}` } : {})
+        },
         body: JSON.stringify({
           gmailAppPassword: configForm.gmailAppPassword,
           whatsappGatewayUrl: configForm.whatsappGatewayUrl,
@@ -289,7 +379,10 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     try {
       const res = await fetch('/api/test-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adminIdToken ? { 'Authorization': `Bearer ${adminIdToken}` } : {})
+        },
         body: JSON.stringify({
           to: configForm.email || 'beeginning4you@gmail.com',
           appPassword: configForm.gmailAppPassword
@@ -682,101 +775,112 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
               </div>
               <p className="text-xs text-white/70">
                 {isAuthenticated
-                  ? 'Gestão de agenda, diagnósticos e personalização de contatos'
-                  : 'Acesso restrito ao administrador'}
+                  ? (adminUser?.email ? `Autenticado: ${adminUser.email}` : 'Sessão administrativa autenticada via Firebase')
+                  : 'Acesso restrito ao administrador (Firebase Auth)'}
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
-            aria-label="Fechar painel"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {isAuthenticated && (
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors cursor-pointer"
+                title="Encerrar sessão administrativa"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Sair</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-colors cursor-pointer"
+              aria-label="Fechar painel"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {!isAuthenticated ? (
-          /* Password Authentication Gate */
+          /* Real Firebase Authentication Gate */
           <div className="p-8 sm:p-12 flex flex-col items-center justify-center text-center space-y-6 flex-1">
             <div className="w-16 h-16 rounded-2xl bg-[#1E3A47]/10 text-[#1E3A47] flex items-center justify-center">
               <Lock className="w-8 h-8" />
             </div>
             <div className="max-w-sm space-y-2">
-              <h4 className="text-lg font-bold text-[#1A1A1A]">Identificação do Administrador</h4>
+              <h4 className="text-lg font-bold text-[#1A1A1A]">Autenticação do Administrador</h4>
               <p className="text-xs text-[#666666]">
-                Digite a senha de acesso para visualizar reuniões, dados de clientes e editar os canais de atendimento.
+                Acesso restrito protegido pelo <strong>Firebase Authentication</strong>. Entre com suas credenciais oficiais para gerenciar reuniões, contatos e disponibilidade.
               </p>
             </div>
 
-            <form onSubmit={handleLogin} className="w-full max-w-xs space-y-3">
-              <div className="relative">
+            <form onSubmit={handleLogin} className="w-full max-w-sm space-y-3.5 text-left">
+              <div>
+                <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                  E-mail de Administrador
+                </label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type="email"
                   required
-                  autoFocus
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Senha de acesso"
-                  className="w-full px-4 py-2.5 pr-10 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] focus:ring-2 focus:ring-[#1E3A47]/20 text-sm outline-none text-center tracking-wider"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="beeginning4you@gmail.com"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] focus:ring-2 focus:ring-[#1E3A47]/20 text-xs outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-[#888888] hover:text-[#1A1A1A]"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
               </div>
 
-              {loginError ? (
-                <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-center space-y-1">
-                  <p className="text-xs text-red-600 font-semibold">{loginError}</p>
+              <div>
+                <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                  Senha do Firebase Auth
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoFocus
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    placeholder="Digite sua senha de administrador"
+                    className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] focus:ring-2 focus:ring-[#1E3A47]/20 text-xs outline-none tracking-wider"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-[#888888] hover:text-[#1A1A1A]"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
-              ) : (
-                <div className="text-center">
-                  <p className="text-[11px] text-[#777777]">
-                    Senha padrão inicial: <button
-                      type="button"
-                      onClick={() => {
-                        setPasswordInput('bee2026');
-                        setLoginError('');
-                      }}
-                      className="font-mono font-bold text-[#1E3A47] underline cursor-pointer hover:text-[#E5A93B]"
-                    >
-                      bee2026
-                    </button>
-                  </p>
+              </div>
+
+              {loginError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-left space-y-1">
+                  <p className="text-xs text-red-700 font-semibold">{loginError}</p>
                 </div>
               )}
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-[#1A1A1A] font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer"
+                disabled={isLoggingIn}
+                className="w-full py-2.5 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-[#1A1A1A] font-bold text-xs uppercase tracking-wider transition-colors shadow-sm cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
               >
-                Acessar Painel
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Autenticando...</span>
+                  </>
+                ) : (
+                  <span>Acessar Painel</span>
+                )}
               </button>
 
-              <div className="pt-2 flex flex-col items-center gap-1.5 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPasswordInput('bee2026');
-                    setLoginError('');
-                  }}
-                  className="text-xs text-[#1E3A47] hover:underline font-medium cursor-pointer"
-                >
-                  Usar senha padrão (bee2026)
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResetToDefaultPassword}
-                  className="text-[11px] text-[#888888] hover:text-[#1A1A1A] underline cursor-pointer"
-                >
-                  Esqueci a senha / Restaurar para bee2026
-                </button>
+              <div className="pt-1 text-center">
+                <span className="text-[11px] text-[#777777]">
+                  Protegido por Firebase Authentication &bull; Sessão segura
+                </span>
               </div>
             </form>
           </div>
@@ -2327,33 +2431,15 @@ service cloud.firestore {
                     </div>
 
                     <div className="pt-4 border-t border-[#EAEAE7] space-y-2 bg-[#FBFBFA] p-4 rounded-xl border border-[#EBEBE8]">
-                      <div className="flex items-center justify-between">
-                        <label className="block font-bold text-[#1A1A1A]">
-                          Alterar Senha de Acesso ao ADM:
-                        </label>
-                        <span className="text-[11px] text-[#777777]">
-                          Padrão inicial: <code className="bg-white px-1.5 py-0.5 rounded border border-[#E0DED7] font-mono text-[#1E3A47]">bee2026</code>
+                      <div className="flex items-center gap-2 text-[#1E3A47]">
+                        <Lock className="w-4 h-4 text-[#E5A93B]" />
+                        <span className="font-bold text-xs text-[#1A1A1A]">
+                          Autenticação Administrativa (Firebase Authentication)
                         </span>
                       </div>
-                      <div className="relative">
-                        <Lock className="w-4 h-4 absolute left-3 top-2.5 text-[#888888]" />
-                        <input
-                          type={showConfigPassword ? 'text' : 'password'}
-                          value={configForm.adminPassword}
-                          onChange={(e) => setConfigForm({ ...configForm, adminPassword: e.target.value })}
-                          placeholder="Digite a nova senha desejada"
-                          className="w-full pl-9 pr-10 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs font-mono bg-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfigPassword(!showConfigPassword)}
-                          className="absolute right-3 top-2.5 text-[#888888] hover:text-[#1A1A1A] cursor-pointer"
-                        >
-                          {showConfigPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-[#666666]">
-                        Ao salvar, esta será a nova senha necessária para entrar na área administrativa.
+                      <p className="text-[11px] text-[#666666] leading-relaxed">
+                        O acesso ao painel é protegido por autenticação segura via <strong>Firebase Authentication</strong> (sem senhas salvas em código).
+                        Para alterar sua senha ou gerenciar administradores, utilize o Console oficial do Firebase em <a href="https://console.firebase.google.com/project/beeginning4you/authentication" target="_blank" rel="noopener noreferrer" className="text-[#1E3A47] font-semibold underline hover:text-[#D99B26]">Firebase Console &rarr; Authentication</a>.
                       </p>
                     </div>
 
@@ -2363,7 +2449,7 @@ service cloud.firestore {
                         className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-[#1A1A1A] text-xs font-bold transition-colors cursor-pointer shadow-sm"
                       >
                         <Save className="w-4 h-4" />
-                        <span>Salvar Alterações e Nova Senha</span>
+                        <span>Salvar Configurações</span>
                       </button>
                     </div>
                   </form>
