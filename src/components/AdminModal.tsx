@@ -1739,12 +1739,12 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                           <li>
                             Acesse a aba de Regras no Console do Firebase:{' '}
                             <a
-                              href="https://console.firebase.google.com/project/beeginning4you/firestore/rules"
+                              href="https://console.firebase.google.com/project/beegining4you/firestore/rules"
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 font-bold text-[#1E3A47] underline hover:text-[#D99B26]"
                             >
-                              <span>Abrir Firebase Console Rules (beeginning4you)</span>
+                              <span>Abrir Firebase Console Rules (beegining4you)</span>
                               <ExternalLink className="w-3 h-3" />
                             </a>
                           </li>
@@ -2439,7 +2439,7 @@ service cloud.firestore {
                       </div>
                       <p className="text-[11px] text-[#666666] leading-relaxed">
                         O acesso ao painel é protegido por autenticação segura via <strong>Firebase Authentication</strong> (sem senhas salvas em código).
-                        Para alterar sua senha ou gerenciar administradores, utilize o Console oficial do Firebase em <a href="https://console.firebase.google.com/project/beeginning4you/authentication" target="_blank" rel="noopener noreferrer" className="text-[#1E3A47] font-semibold underline hover:text-[#D99B26]">Firebase Console &rarr; Authentication</a>.
+                        Para alterar sua senha ou gerenciar administradores, utilize o Console oficial do Firebase em <a href="https://console.firebase.google.com/project/beegining4you/authentication" target="_blank" rel="noopener noreferrer" className="text-[#1E3A47] font-semibold underline hover:text-[#D99B26]">Firebase Console &rarr; Authentication</a>.
                       </p>
                     </div>
 
