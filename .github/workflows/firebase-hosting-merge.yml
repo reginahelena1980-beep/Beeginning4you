@@ -14,6 +14,26 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BEEGINNING4YOU }}'
+      # TEMPORARY: Diagnostic step to verify service account identity. Remove after investigation.
+      - name: '[TEMPORARY] Diagnostic: Print Service Account Client Email'
+        env:
+          SERVICE_ACCOUNT_JSON: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BEEGINNING4YOU }}'
+        run: |
+          set +x
+          node <<'NODE'
+          try {
+            const credentials = JSON.parse(process.env.SERVICE_ACCOUNT_JSON || '{}');
+            const email = credentials.client_email;
+            if (typeof email !== 'string' ||
+                !/^[^@\s]+@[^@\s]+\.gserviceaccount\.com$/.test(email)) {
+              throw new Error('Invalid service account email');
+            }
+            console.log('Service account email:', email);
+          } catch {
+            console.error('Unable to identify service account');
+            process.exitCode = 1;
+          }
+          NODE
       - name: Deploy Firestore & Storage Security Rules
         run: npx --yes firebase-tools deploy --only firestore:rules,storage --project beegining4you
       - name: Deploy to Firebase Hosting
