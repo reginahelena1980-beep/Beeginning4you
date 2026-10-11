@@ -26,11 +26,11 @@ service cloud.firestore {
           'mainGoal', 'urgency', 'notes'
         ]) &&
         !('adminNotes' in data) &&
-        data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
-        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
-        (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 200 &&
+        (!('id' in data) || (data.id is string && data.id.size() >= 3 && data.id.size() <= 128)) &&
+        (!('email' in data) || (data.email is string && (data.email.size() == 0 || (data.email.size() <= 200 && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'))))) &&
         (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
-        (!('contactMethod' in data) || (data.contactMethod is string && data.contactMethod.size() <= 50)) &&
+        (!('contactMethod' in data) || (data.contactMethod is string && data.contactMethod in ['whatsapp', 'email'])) &&
         (!('contactValue' in data) || (data.contactValue is string && data.contactValue.size() <= 200)) &&
         (!('biggestNeed' in data) || (data.biggestNeed is string && data.biggestNeed.size() <= 3000)) &&
         (!('businessName' in data) || (data.businessName is string && data.businessName.size() <= 200)) &&
@@ -40,9 +40,9 @@ service cloud.firestore {
         (!('source' in data) || (data.source is string && data.source.size() <= 100)) &&
         (!('origin' in data) || (data.origin is string && data.origin.size() <= 100)) &&
         (!('mainGoal' in data) || (data.mainGoal is string && data.mainGoal.size() <= 200)) &&
-        (!('urgency' in data) || (data.urgency is string && data.urgency.size() <= 50)) &&
+        (!('urgency' in data) || (data.urgency is string && data.urgency in ['baixa', 'media', 'alta', 'imediata', 'urgente'])) &&
         (!('notes' in data) || (data.notes is string && data.notes.size() <= 3000)) &&
-        (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+        (!('status' in data) || (data.status is string && data.status in ['Novo', 'new', 'in_progress'])) &&
         (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100)) &&
         (!('syncedAt' in data) || (data.syncedAt is string && data.syncedAt.size() <= 100));
     }
@@ -58,20 +58,21 @@ service cloud.firestore {
         ]) &&
         !('diagnosticNotes' in data) &&
         !('adminNotes' in data) &&
-        data.clientName is string && data.clientName.size() > 0 && data.clientName.size() <= 200 &&
-        data.date is string && data.date.size() <= 50 &&
-        data.time is string && data.time.size() <= 50 &&
-        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
-        (!('clientEmail' in data) || (data.clientEmail is string && data.clientEmail.size() <= 200)) &&
-        (!('clientPhone' in data) || (data.clientPhone is string && data.clientPhone.size() <= 50)) &&
+        data.clientName is string && data.clientName.size() >= 2 && data.clientName.size() <= 200 &&
+        data.date is string && data.date.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+        data.time is string && data.time.matches('^\\d{2}:\\d{2}$') &&
+        (!('id' in data) || (data.id is string && data.id.size() >= 3 && data.id.size() <= 128)) &&
+        (!('clientEmail' in data) || (data.clientEmail is string && data.clientEmail.size() <= 200 && data.clientEmail.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$'))) &&
+        (!('clientPhone' in data) || (data.clientPhone is string && data.clientPhone.size() >= 8 && data.clientPhone.size() <= 50)) &&
         (!('topic' in data) || (data.topic is string && data.topic.size() <= 1000)) &&
-        (!('durationMinutes' in data) || (data.durationMinutes is number)) &&
-        (!('meetLink' in data) || (data.meetLink is string && data.meetLink.size() <= 500)) &&
-        (!('status' in data) || (data.status is string && data.status.size() <= 50)) &&
+        (!('durationMinutes' in data) || (data.durationMinutes is int && data.durationMinutes == 45)) &&
+        (!('meetLink' in data) || (data.meetLink is string && data.meetLink.size() <= 200 && (data.meetLink == 'https://meet.google.com/fxx-ctnv-hgm' || data.meetLink.matches('^https://meet\\.google\\.com/[a-z0-9-]+$')))) &&
+        (!('status' in data) || (data.status is string && data.status == 'confirmed')) &&
         (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 100)) &&
         (!('syncedAt' in data) || (data.syncedAt is string && data.syncedAt.size() <= 100)) &&
         (!('confidentialityAccepted' in data) || (data.confidentialityAccepted is bool)) &&
-        (!('history' in data) || (data.history is list));
+        (!('history' in data) || (data.history is list && data.history.size() <= 2 &&
+          (data.history.size() == 0 || (data.history[0] is map && data.history[0].keys().hasAll(['date', 'action']) && data.history[0].date is string && data.history[0].action is string && data.history[0].action.size() <= 300))));
     }
 
     // Configurações globais do site (leitura pública, escrita restrita ao administrador)
@@ -86,10 +87,9 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
-    // Agendamentos de reuniões Google Meet (visitantes criam com campos permitidos; leitura e gestão restritas ao administrador)
+    // Agendamentos de reuniões Google Meet (acesso direto no Firestore restrito ao administrador oficial; clientes usam exclusivamente a API Express)
     match /appointments/{appointmentId} {
-      allow create: if isAdmin() || isPublicValidAppointment();
-      allow read, update, delete: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     // Registro de administradores autenticados (acesso restrito exclusivamente ao administrador oficial)

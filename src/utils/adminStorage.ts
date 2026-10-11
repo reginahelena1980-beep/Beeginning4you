@@ -194,6 +194,7 @@ export async function loadAdminCrmData(idToken?: string): Promise<{
     if (Array.isArray(remoteDemands) && remoteDemands.length > 0) {
       inMemoryDemands = remoteDemands;
     }
+
     if (Array.isArray(remoteAppointments) && remoteAppointments.length > 0) {
       inMemoryAppointments = remoteAppointments;
     }
@@ -557,7 +558,8 @@ export function getAdminAppointments(): MeetingAppointment[] {
 }
 
 export function saveAppointmentWithDiagnostic(
-  appointment: MeetingAppointment
+  appointment: MeetingAppointment,
+  idToken?: string
 ): MeetingAppointment[] {
   const existingIdx = inMemoryAppointments.findIndex((m) => m.id === appointment.id);
 
@@ -600,7 +602,10 @@ export function saveAppointmentWithDiagnostic(
   try {
     fetch('/api/appointments', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+      },
       body: JSON.stringify({ appointment: withDiagnostic })
     }).catch(() => {});
   } catch {}
@@ -667,11 +672,19 @@ export function updateMeetingDiagnostic(
   return inMemoryAppointments;
 }
 
-export function deleteAppointmentInStorage(id: string): MeetingAppointment[] {
+export function deleteAppointmentInStorage(id: string, idToken?: string): MeetingAppointment[] {
   inMemoryAppointments = inMemoryAppointments.filter((m) => m.id !== id);
   deleteAppointmentFromFirestore(id);
   const demandId = `demand-from-${id}`;
   deleteDemandForm(demandId);
+  try {
+    fetch(`/api/appointments/${id}`, {
+      method: 'DELETE',
+      headers: {
+        ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
+      }
+    }).catch(() => {});
+  } catch {}
   notifyStorageChange();
   return inMemoryAppointments;
 }

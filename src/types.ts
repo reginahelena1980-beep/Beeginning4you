@@ -108,6 +108,7 @@ export interface MeetingAppointment {
   createdAt: string;
   updatedAt?: string;
   confidentialityAccepted: boolean;
+  manageToken?: string;
   diagnosticNotes?: MeetingDiagnosticData;
   history?: Array<{
     date: string;

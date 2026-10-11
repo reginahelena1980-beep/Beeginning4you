@@ -213,7 +213,7 @@ export default function ConversationModal({
     onClose();
   };
 
-  const handleConfirmMeeting = (e: React.FormEvent) => {
+  const handleConfirmMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!meetingTermAccepted) {
       setBookingError(
@@ -274,13 +274,24 @@ export default function ConversationModal({
       ]
     };
 
-    saveAppointment(newAppointment);
-    setLastBookedMeeting(newAppointment);
+    const res = await saveAppointment(newAppointment);
+    if (!res.success) {
+      setBookingError(
+        res.error ||
+          (isEn
+            ? 'Could not confirm appointment. Please select another slot.'
+            : 'Não foi possível confirmar o agendamento. Por favor, selecione outro horário.')
+      );
+      return;
+    }
+
+    const appointmentWithToken = res.appointment;
+    setLastBookedMeeting(appointmentWithToken);
     setBookingSuccess(true);
     setActionNotice('');
 
     // Trigger official confirmation email dispatch directly from beeginning4you@gmail.com
-    sendOfficialConfirmationEmail(newAppointment, isEn);
+    sendOfficialConfirmationEmail(appointmentWithToken, isEn);
   };
 
   // Helper to re-send appointment confirmation to client via Official Email
@@ -334,34 +345,44 @@ export default function ConversationModal({
     const prevDate = lastBookedMeeting.date;
     const prevTime = lastBookedMeeting.time;
 
-    rescheduleAppointmentInStorage(lastBookedMeeting.id, rescheduleDate, rescheduleTime);
-
-    const updated: MeetingAppointment = {
+    const candidateUpdate: MeetingAppointment = {
       ...lastBookedMeeting,
       date: rescheduleDate,
       time: rescheduleTime,
-      status: 'rescheduled',
-      history: [
-        ...(lastBookedMeeting.history || []),
-        {
-          date: new Date().toISOString(),
-          action: `Reagendada pelo cliente para ${rescheduleDate} às ${rescheduleTime}`
-        }
-      ]
+      status: 'rescheduled'
     };
 
-    setLastBookedMeeting(updated);
-    setIsRescheduling(false);
-    setRescheduleError('');
-
-    // Dispatch official rescheduling notification email from beeginning4you@gmail.com
-    sendOfficialRescheduleEmail(updated, prevDate, prevTime, isEn);
-
-    setActionNotice(
-      isEn
-        ? `Meeting rescheduled! Official update dispatched from ${OFFICIAL_EMAIL} to ${updated.clientEmail}.`
-        : `Reunião reagendada com sucesso! Notificação oficial disparada de ${OFFICIAL_EMAIL} para ${updated.clientEmail}.`
-    );
+    // Envia solicitação com verificação de persistência durável no backend
+    sendOfficialRescheduleEmail(candidateUpdate, prevDate, prevTime, isEn).then((res) => {
+      if (res.persisted) {
+        rescheduleAppointmentInStorage(lastBookedMeeting.id, rescheduleDate, rescheduleTime, lastBookedMeeting);
+        const updated: MeetingAppointment = {
+          ...candidateUpdate,
+          history: [
+            ...(lastBookedMeeting.history || []),
+            {
+              date: new Date().toISOString(),
+              action: `Reagendada pelo cliente para ${rescheduleDate} às ${rescheduleTime}`
+            }
+          ]
+        };
+        setLastBookedMeeting(updated);
+        setIsRescheduling(false);
+        setRescheduleError('');
+        setActionNotice(
+          isEn
+            ? `Meeting successfully rescheduled and persisted! Notification sent to ${updated.clientEmail}.`
+            : `Reunião reagendada e atualizada com sucesso no sistema! Notificação enviada para ${updated.clientEmail}.`
+        );
+      } else {
+        setRescheduleError(
+          res.error ||
+            (isEn
+              ? 'Could not reschedule appointment. Please select another slot.'
+              : 'Não foi possível reagendar o agendamento. Por favor, escolha outro horário disponível.')
+        );
+      }
+    });
   };
 
   // Autonomous Cancellation Action
@@ -372,31 +393,39 @@ export default function ConversationModal({
 
   const handleConfirmCancel = () => {
     if (!lastBookedMeeting) return;
-    cancelAppointmentInStorage(lastBookedMeeting.id);
 
-    const updated: MeetingAppointment = {
-      ...lastBookedMeeting,
-      status: 'cancelled',
-      history: [
-        ...(lastBookedMeeting.history || []),
-        {
-          date: new Date().toISOString(),
-          action: 'Reunião cancelada pelo cliente'
-        }
-      ]
-    };
-
-    setLastBookedMeeting(updated);
-    setIsCancelling(false);
-
-    // Dispatch official cancellation email from beeginning4you@gmail.com
-    sendOfficialCancellationEmail(updated, isEn);
-
-    setActionNotice(
-      isEn
-        ? `Meeting cancelled. Official cancellation notice sent from ${OFFICIAL_EMAIL} to ${updated.clientEmail}.`
-        : `Reunião cancelada com sucesso. Notificação oficial enviada a partir de ${OFFICIAL_EMAIL} para ${updated.clientEmail}.`
-    );
+    // Envia solicitação com verificação de persistência durável no backend
+    sendOfficialCancellationEmail(lastBookedMeeting, isEn).then((res) => {
+      if (res.persisted) {
+        cancelAppointmentInStorage(lastBookedMeeting.id, lastBookedMeeting);
+        const updated: MeetingAppointment = {
+          ...lastBookedMeeting,
+          status: 'cancelled',
+          history: [
+            ...(lastBookedMeeting.history || []),
+            {
+              date: new Date().toISOString(),
+              action: 'Reunião cancelada pelo cliente'
+            }
+          ]
+        };
+        setLastBookedMeeting(updated);
+        setIsCancelling(false);
+        setActionNotice(
+          isEn
+            ? `Meeting successfully cancelled and updated in the system. Notice dispatched to ${updated.clientEmail}.`
+            : `Reunião cancelada e atualizada com sucesso no sistema. Notificação enviada para ${updated.clientEmail}.`
+        );
+      } else {
+        setIsCancelling(false);
+        setActionNotice(
+          res.error ||
+            (isEn
+              ? 'Could not cancel meeting. Please try again or contact support.'
+              : 'Não foi possível cancelar a reunião. Por favor, tente novamente ou entre em contato.')
+        );
+      }
+    });
   };
 
   // Reset to schedule another meeting

@@ -11,7 +11,6 @@ import {
   notifyStorageChange,
   updateDemandForm
 } from './adminStorage';
-import { saveAppointmentToFirestore } from '../firebase';
 
 export {
   isSlotBlocked,
@@ -69,69 +68,74 @@ export function getSavedAppointments(): MeetingAppointment[] {
   return [];
 }
 
-export function saveAppointment(appointment: MeetingAppointment): MeetingAppointment[] {
-  // Criação pública de agendamento: persistir SOMENTE campos públicos permitidos, sem diagnosticNotes
-  const publicAppt: MeetingAppointment = {
-    id: appointment.id,
-    clientName: appointment.clientName,
-    clientEmail: appointment.clientEmail,
-    clientPhone: appointment.clientPhone,
-    topic: appointment.topic,
-    date: appointment.date,
-    time: appointment.time,
-    durationMinutes: appointment.durationMinutes || 45,
-    meetLink: appointment.meetLink || FIXED_GOOGLE_MEET_URL,
-    status: appointment.status || 'confirmed',
-    createdAt: appointment.createdAt || new Date().toISOString(),
-    confidentialityAccepted: Boolean(appointment.confidentialityAccepted),
-    history: appointment.history || []
-  };
-
-  // Salva no Firestore estritamente com campos públicos permitidos pelo firestore.rules
-  saveAppointmentToFirestore(publicAppt);
-
+export async function saveAppointment(appointment: MeetingAppointment): Promise<{
+  success: boolean;
+  appointment: MeetingAppointment;
+  manageToken?: string;
+  error?: string;
+}> {
   try {
-    fetch('/api/appointments', {
+    const res = await fetch('/api/appointments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appointment: publicAppt })
-    }).catch(() => {});
-  } catch {}
-
-  notifyStorageChange();
-  return [publicAppt];
+      body: JSON.stringify({ appointment })
+    });
+    const data = await res.json();
+    if (res.ok && data?.success) {
+      const savedAppt = data.appointment || appointment;
+      const token = data.manageToken;
+      if (typeof window !== 'undefined' && token && savedAppt.id) {
+        try {
+          sessionStorage.setItem(`appt_token_${savedAppt.id}`, token);
+          localStorage.setItem(`appt_token_${savedAppt.id}`, token);
+        } catch {}
+      }
+      notifyStorageChange();
+      return {
+        success: true,
+        appointment: { ...savedAppt, manageToken: token },
+        manageToken: token
+      };
+    }
+    return {
+      success: false,
+      appointment,
+      error: data?.error || 'Não foi possível confirmar o agendamento.'
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      appointment,
+      error: err?.message || 'Erro ao conectar ao servidor de agendamentos.'
+    };
+  }
 }
 
-export function cancelAppointmentInStorage(id: string): MeetingAppointment[] {
+export function cancelAppointmentInStorage(
+  id: string,
+  existingAppointment?: MeetingAppointment
+): MeetingAppointment[] {
   const updated: MeetingAppointment = {
     id,
-    clientName: '',
-    clientEmail: '',
-    clientPhone: '',
-    topic: '',
-    date: '',
-    time: '',
-    durationMinutes: 45,
-    meetLink: FIXED_GOOGLE_MEET_URL,
+    clientName: existingAppointment?.clientName || '',
+    clientEmail: existingAppointment?.clientEmail || '',
+    clientPhone: existingAppointment?.clientPhone || '',
+    topic: existingAppointment?.topic || '',
+    date: existingAppointment?.date || '',
+    time: existingAppointment?.time || '',
+    durationMinutes: existingAppointment?.durationMinutes || 45,
+    meetLink: existingAppointment?.meetLink || FIXED_GOOGLE_MEET_URL,
     status: 'cancelled',
-    createdAt: new Date().toISOString(),
+    createdAt: existingAppointment?.createdAt || new Date().toISOString(),
     confidentialityAccepted: true,
     history: [
+      ...(existingAppointment?.history || []),
       {
         date: new Date().toISOString(),
         action: 'Reunião cancelada pelo cliente'
       }
     ]
   };
-
-  saveAppointmentToFirestore(updated);
-  try {
-    fetch('/api/appointments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appointment: updated })
-    }).catch(() => {});
-  } catch {}
 
   const demandId = `demand-from-${id}`;
   updateDemandForm(demandId, {
@@ -146,37 +150,30 @@ export function cancelAppointmentInStorage(id: string): MeetingAppointment[] {
 export function rescheduleAppointmentInStorage(
   id: string,
   newDate: string,
-  newTime: string
+  newTime: string,
+  existingAppointment?: MeetingAppointment
 ): MeetingAppointment[] {
   const updated: MeetingAppointment = {
     id,
-    clientName: '',
-    clientEmail: '',
-    clientPhone: '',
-    topic: '',
+    clientName: existingAppointment?.clientName || '',
+    clientEmail: existingAppointment?.clientEmail || '',
+    clientPhone: existingAppointment?.clientPhone || '',
+    topic: existingAppointment?.topic || '',
     date: newDate,
     time: newTime,
-    durationMinutes: 45,
-    meetLink: FIXED_GOOGLE_MEET_URL,
+    durationMinutes: existingAppointment?.durationMinutes || 45,
+    meetLink: existingAppointment?.meetLink || FIXED_GOOGLE_MEET_URL,
     status: 'rescheduled',
-    createdAt: new Date().toISOString(),
+    createdAt: existingAppointment?.createdAt || new Date().toISOString(),
     confidentialityAccepted: true,
     history: [
+      ...(existingAppointment?.history || []),
       {
         date: new Date().toISOString(),
-        action: `Reagendada para ${newDate} ${newTime}`
+        action: `Reagendada para ${newDate} às ${newTime}`
       }
     ]
   };
-
-  saveAppointmentToFirestore(updated);
-  try {
-    fetch('/api/appointments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appointment: updated })
-    }).catch(() => {});
-  } catch {}
 
   const demandId = `demand-from-${id}`;
   updateDemandForm(demandId, {
@@ -314,22 +311,36 @@ export async function sendOfficialRescheduleEmail(
   prevDate?: string,
   prevTime?: string,
   isEn = false
-): Promise<{ success: boolean; message?: string }> {
+): Promise<{ success: boolean; persisted?: boolean; message?: string; error?: string }> {
   try {
+    const manageToken =
+      appointment.manageToken ||
+      (typeof window !== 'undefined' ? sessionStorage.getItem(`appt_token_${appointment.id}`) : '') ||
+      '';
+
     const res = await fetch('/api/appointments/reschedule-notification', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(manageToken ? { 'x-appointment-token': manageToken } : {})
+      },
       body: JSON.stringify({
         appointmentId: appointment.id,
         newDate: appointment.date,
-        newTime: appointment.time
+        newTime: appointment.time,
+        manageToken
       })
     });
     const data = await res.json();
-    return { success: !!data?.success, message: data?.message || data?.error };
+    return {
+      success: res.ok && !!data?.success && !!data?.persisted,
+      persisted: !!data?.persisted,
+      message: data?.message,
+      error: data?.error
+    };
   } catch (err: any) {
     console.warn('[Email Dispatch] Falha no backend ao notificar reagendamento', err);
-    return { success: false, message: err?.message };
+    return { success: false, persisted: false, error: err?.message };
   }
 }
 
@@ -339,18 +350,61 @@ export async function sendOfficialRescheduleEmail(
 export async function sendOfficialCancellationEmail(
   appointment: MeetingAppointment,
   isEn = false
-): Promise<{ success: boolean; message?: string }> {
+): Promise<{ success: boolean; persisted?: boolean; message?: string; error?: string }> {
   try {
+    const manageToken =
+      appointment.manageToken ||
+      (typeof window !== 'undefined' ? sessionStorage.getItem(`appt_token_${appointment.id}`) : '') ||
+      '';
+
     const res = await fetch('/api/appointments/cancel-notification', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appointmentId: appointment.id })
+      headers: {
+        'Content-Type': 'application/json',
+        ...(manageToken ? { 'x-appointment-token': manageToken } : {})
+      },
+      body: JSON.stringify({
+        appointmentId: appointment.id,
+        manageToken
+      })
     });
     const data = await res.json();
-    return { success: !!data?.success, message: data?.message || data?.error };
+    return {
+      success: res.ok && !!data?.success && !!data?.persisted,
+      persisted: !!data?.persisted,
+      message: data?.message,
+      error: data?.error
+    };
   } catch (err: any) {
     console.warn('[Email Dispatch] Falha no backend ao notificar cancelamento', err);
-    return { success: false, message: err?.message };
+    return { success: false, persisted: false, error: err?.message };
+  }
+}
+
+/**
+ * Solicitação segura de recuperação de acesso ao agendamento por e-mail
+ */
+export async function requestAppointmentAccessByEmail(
+  email: string
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await fetch('/api/appointments/request-access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientEmail: email })
+    });
+    const data = await res.json();
+    return {
+      success: !!data?.success,
+      message:
+        data?.message ||
+        'Se houver agendamentos associados a este e-mail, as instruções foram enviadas.'
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: 'Falha de comunicação com o servidor ao solicitar link de acesso.'
+    };
   }
 }
 

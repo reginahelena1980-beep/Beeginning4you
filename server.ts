@@ -6,6 +6,9 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -21,19 +24,34 @@ const SERVER_CONFIG_FILE = path.resolve(__dirname, 'admin_server_config.json');
 const SERVER_DATA_FILE = path.resolve(__dirname, 'admin_app_data.json');
 const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'beegining4you';
 
-// Inicialização segura do Firebase Admin SDK para verificação de tokens
+// Inicialização segura do Firebase Admin SDK para verificação de tokens e acesso ao Firestore
 let firebaseAdminApp: any = null;
+let adminDb: any = null;
 const canonicalServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY || process.env.FIREBASE_ADMIN_CREDENTIALS;
 
 if (!getApps().length) {
   try {
-    if (canonicalServiceAccount) {
+    if (canonicalServiceAccount && canonicalServiceAccount.trim().startsWith('{')) {
       const serviceAccount = JSON.parse(canonicalServiceAccount);
       firebaseAdminApp = initializeApp({
         credential: cert(serviceAccount),
         projectId: FIREBASE_PROJECT_ID
       });
       console.log(`[Firebase Admin] SDK inicializado com conta de serviço para o projeto: ${FIREBASE_PROJECT_ID}`);
+    } else if (
+      canonicalServiceAccount &&
+      canonicalServiceAccount.includes('BEGIN PRIVATE KEY') &&
+      process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL
+    ) {
+      firebaseAdminApp = initializeApp({
+        credential: cert({
+          projectId: FIREBASE_PROJECT_ID,
+          clientEmail: process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL,
+          privateKey: canonicalServiceAccount.replace(/\\n/g, '\n')
+        }),
+        projectId: FIREBASE_PROJECT_ID
+      });
+      console.log(`[Firebase Admin] SDK inicializado com credenciais explícitas para: ${process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL}`);
     } else {
       firebaseAdminApp = initializeApp({
         projectId: FIREBASE_PROJECT_ID
@@ -46,6 +64,16 @@ if (!getApps().length) {
   }
 } else {
   firebaseAdminApp = getApps()[0];
+}
+
+if (firebaseAdminApp) {
+  try {
+    adminDb = getAdminFirestore(firebaseAdminApp);
+    console.log(`[Firebase Admin] Firestore Admin SDK conectado ao projeto: ${FIREBASE_PROJECT_ID}`);
+  } catch (err: any) {
+    console.warn('[Firebase Admin] Firestore Admin indisponível no momento:', err?.message);
+    adminDb = null;
+  }
 }
 
 // Middleware de autorização administrativo com Firebase ID Token (FAIL-CLOSED, SEM FALLBACKS)
@@ -130,7 +158,20 @@ function getServerAppData(): ServerAppData {
   try {
     if (fs.existsSync(SERVER_DATA_FILE)) {
       const content = fs.readFileSync(SERVER_DATA_FILE, 'utf-8');
-      return JSON.parse(content);
+      const data = JSON.parse(content);
+      if (Array.isArray(data.appointments)) {
+        let modified = false;
+        data.appointments.forEach((a: any) => {
+          if (a && (!a.manageToken || typeof a.manageToken !== 'string')) {
+            a.manageToken = `tok_${Date.now().toString(36)}_${crypto.randomBytes(16).toString('hex')}`;
+            modified = true;
+          }
+        });
+        if (modified) {
+          saveServerAppData(data);
+        }
+      }
+      return data;
     }
   } catch (err) {
     console.warn('[Server Data] Erro ao ler dados persistidos no servidor', err);
@@ -138,12 +179,221 @@ function getServerAppData(): ServerAppData {
   return {};
 }
 
-function saveServerAppData(data: ServerAppData) {
+function saveServerAppData(data: ServerAppData): boolean {
   try {
-    fs.writeFileSync(SERVER_DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    const tempFile = `${SERVER_DATA_FILE}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 6)}`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tempFile, SERVER_DATA_FILE);
+    return true;
   } catch (err) {
     console.error('[Server Data] Erro ao salvar dados no servidor', err);
+    return false;
   }
+}
+
+function hashToken(rawToken: string): string {
+  return crypto.createHash('sha256').update(rawToken.trim()).digest('hex');
+}
+
+function verifyToken(providedToken: string, storedHash?: string, legacyRaw?: string): boolean {
+  if (!providedToken) return false;
+  if (storedHash && typeof storedHash === 'string') {
+    const computedHash = hashToken(providedToken);
+    try {
+      const a = Buffer.from(computedHash, 'hex');
+      const b = Buffer.from(storedHash, 'hex');
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+        return true;
+      }
+    } catch {}
+  }
+  if (legacyRaw && typeof legacyRaw === 'string') {
+    return providedToken.trim() === legacyRaw.trim();
+  }
+  return false;
+}
+
+// Helpers para persistência unificada com Cloud Firestore como SSOT e espelhamento local
+async function getAllAppointments(): Promise<any[]> {
+  if (adminDb) {
+    try {
+      const snap = await adminDb.collection('appointments').get();
+      const list: any[] = [];
+      snap.forEach((doc: any) => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      if (list.length > 0) {
+        list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        return list;
+      }
+    } catch (err: any) {
+      console.warn('[Firestore Admin] Fallback local para leitura de agendamentos:', err?.message);
+    }
+  }
+  const data = getServerAppData();
+  return data.appointments || [];
+}
+
+async function getAppointmentById(id: string): Promise<any | null> {
+  if (adminDb) {
+    try {
+      const snap = await adminDb.collection('appointments').doc(id).get();
+      if (snap.exists) {
+        return { id: snap.id, ...snap.data() };
+      }
+    } catch (err: any) {
+      console.warn('[Firestore Admin] Fallback local para busca de agendamento por ID:', err?.message);
+    }
+  }
+  const data = getServerAppData();
+  return (data.appointments || []).find((a: any) => a && a.id === id) || null;
+}
+
+async function persistAppointment(appointment: any): Promise<boolean> {
+  let firestoreSaved = false;
+  if (adminDb) {
+    try {
+      const { id, ...dataToSave } = appointment;
+      await adminDb.collection('appointments').doc(id).set(dataToSave, { merge: true });
+      firestoreSaved = true;
+    } catch (err: any) {
+      console.warn('[Firestore Admin] Não foi possível persistir diretamente no Firestore:', err?.message);
+    }
+  }
+
+  // Mantém cópia local sincronizada para resiliência e testes
+  const current = getServerAppData();
+  const existing = current.appointments || [];
+  const idx = existing.findIndex((a: any) => a && a.id === appointment.id);
+  if (idx >= 0) {
+    existing[idx] = { ...existing[idx], ...appointment };
+  } else {
+    existing.unshift(appointment);
+  }
+  current.appointments = existing;
+  const localSaved = saveServerAppData(current);
+
+  return firestoreSaved || localSaved;
+}
+
+async function deleteAppointmentFromStore(id: string): Promise<boolean> {
+  if (adminDb) {
+    try {
+      await adminDb.collection('appointments').doc(id).delete();
+    } catch (err: any) {
+      console.warn('[Firestore Admin] Erro ao excluir no Firestore:', err?.message);
+    }
+  }
+  const current = getServerAppData();
+  current.appointments = (current.appointments || []).filter((a: any) => a && a.id !== id);
+  return saveServerAppData(current);
+}
+
+async function getAdminBlockedSlots(): Promise<any[]> {
+  if (adminDb) {
+    try {
+      const snap = await adminDb.collection('settings').doc('contact_config').get();
+      if (snap.exists) {
+        const data = snap.data();
+        if (Array.isArray(data?.availability?.blockedSlots)) {
+          return data.availability.blockedSlots;
+        }
+      }
+    } catch (err: any) {
+      console.warn('[Firestore Admin] Fallback local para leitura de bloqueios:', err?.message);
+    }
+  }
+  const current = getServerAppData();
+  return current.config?.availability?.blockedSlots || [];
+}
+
+async function isSlotTaken(date: string, time: string, excludeId?: string): Promise<boolean> {
+  const appointments = await getAllAppointments();
+  return appointments.some(
+    (a) => a && a.id !== excludeId && a.status !== 'cancelled' && a.date === date && a.time === time
+  );
+}
+
+async function isSlotAdminBlocked(date: string, time: string): Promise<boolean> {
+  const blockedSlots = await getAdminBlockedSlots();
+  return blockedSlots.some(
+    (b: any) => b && b.date === date && (!b.time || b.time === 'ALL_DAY' || b.time.trim() === '' || b.time === time)
+  );
+}
+
+// Helper para autorização verificável: Administradora autenticada OU titular com token criptográfico válido
+async function verifyAppointmentAccess(
+  req: express.Request,
+  appointment: any
+): Promise<{ authorized: boolean; isAdmin: boolean; errorStatus?: number; errorMessage?: string }> {
+  // 1. Verifica se a requisição possui token de administrador oficial válido via Firebase ID Token
+  const adminUser = await getAuthenticatedAdmin(req);
+  if (adminUser) {
+    return { authorized: true, isAdmin: true };
+  }
+
+  // 2. Extrai o token de gerenciamento do titular do agendamento (headers ou body)
+  const headerToken = req.headers['x-appointment-token'];
+  const authHeader = req.headers.authorization;
+  let bearerToken: string | undefined;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    bearerToken = authHeader.split('Bearer ')[1]?.trim();
+  }
+
+  const clientToken = (
+    (typeof req.body?.manageToken === 'string' ? req.body.manageToken.trim() : '') ||
+    (typeof req.body?.token === 'string' ? req.body.token.trim() : '') ||
+    (typeof headerToken === 'string' ? headerToken.trim() : '') ||
+    (typeof bearerToken === 'string' ? bearerToken.trim() : '')
+  );
+
+  // 3. Rejeita se nenhum token de gerenciamento foi fornecido
+  if (!clientToken) {
+    return {
+      authorized: false,
+      isAdmin: false,
+      errorStatus: 401,
+      errorMessage: 'Acesso não autorizado. Token de gerenciamento do agendamento não informado.'
+    };
+  }
+
+  // 4. Validação criptográfica do token do agendamento (com suporte a hash seguro ou legado)
+  const storedHash = appointment?.tokenHash;
+  const legacyToken = appointment?.manageToken;
+
+  if (!storedHash && !legacyToken) {
+    return {
+      authorized: false,
+      isAdmin: false,
+      errorStatus: 403,
+      errorMessage: 'Acesso negado. Token de autorização inválido para este agendamento.'
+    };
+  }
+
+  const isValid = verifyToken(clientToken, storedHash, legacyToken);
+  if (!isValid) {
+    return {
+      authorized: false,
+      isAdmin: false,
+      errorStatus: 403,
+      errorMessage: 'Acesso negado. Token de autorização incorreto para este agendamento.'
+    };
+  }
+
+  // 5. Verificação de expiração do token se definida
+  if (appointment?.tokenExpiresAt) {
+    const expiresMs = new Date(appointment.tokenExpiresAt).getTime();
+    if (!isNaN(expiresMs) && Date.now() > expiresMs) {
+      return {
+        authorized: false,
+        isAdmin: false,
+        errorStatus: 403,
+        errorMessage: 'Acesso negado. O prazo de validade deste token de agendamento expirou.'
+      };
+    }
+  }
+
+  return { authorized: true, isAdmin: false };
 }
 
 // Helper to get active server credentials (stored exclusively on server)
@@ -232,10 +482,9 @@ app.post('/api/config', requireAdminAuth, (req, res) => {
 });
 
 // 1.2 API: Endpoint PÚBLICO para checagem segura de horários ocupados (ZERO PII / SEM DADOS DE CLIENTES)
-app.get('/api/booked-slots', (_req, res) => {
+app.get('/api/booked-slots', async (_req, res) => {
   try {
-    const data = getServerAppData();
-    const appointments = data.appointments || [];
+    const appointments = await getAllAppointments();
     // Retorna apenas { date, time } de agendamentos não cancelados, sem qualquer identificação de cliente
     const bookedSlots = appointments
       .filter((a) => a && a.status !== 'cancelled' && a.date && a.time)
@@ -254,6 +503,7 @@ async function sendServerAppointmentEmail(appointment: {
   time: string;
   topic?: string;
   meetLink?: string;
+  manageToken?: string;
 }) {
   const config = getServerConfig();
   const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
@@ -335,10 +585,18 @@ async function sendServerAppointmentEmail(appointment: {
 }
 
 // 1.3 API: Agendamentos de Reuniões Google Meet (LISTAGEM REQUER ADMIN)
-app.get('/api/appointments', requireAdminAuth, (_req, res) => {
+app.get('/api/appointments', requireAdminAuth, async (_req, res) => {
   try {
-    const data = getServerAppData();
-    return res.status(200).json({ success: true, appointments: data.appointments || [] });
+    const appointments = await getAllAppointments();
+    // Higieniza tokenHash e segredos antes de devolver à UI administrativa
+    const sanitized = appointments.map((a) => {
+      const copy = { ...a };
+      delete copy.tokenHash;
+      delete copy.manageToken;
+      copy.hasSecurityToken = true;
+      return copy;
+    });
+    return res.status(200).json({ success: true, appointments: sanitized });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
   }
@@ -354,32 +612,31 @@ app.post('/api/appointments', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Dados do agendamento inválidos.' });
     }
 
-    const current = getServerAppData();
-    const existing = current.appointments || [];
-
     // Se a requisição vem de um administrador autenticado, permite criar ou atualizar
     if (adminUser) {
       if (!body.id || !body.clientName || !body.date || !body.time) {
         return res.status(400).json({ success: false, error: 'Dados obrigatórios do agendamento incompletos.' });
       }
-      const index = existing.findIndex((a) => a.id === body.id);
-      if (index >= 0) {
-        existing[index] = { ...existing[index], ...body, updatedAt: new Date().toISOString() };
-      } else {
-        existing.unshift(body);
-      }
-      current.appointments = existing;
-      saveServerAppData(current);
-      return res.status(200).json({ success: true, message: 'Agendamento salvo pelo administrador.', appointment: body });
+      const existingAppt = await getAppointmentById(body.id);
+      const appointmentToSave = {
+        ...(existingAppt || {}),
+        ...body,
+        updatedAt: new Date().toISOString()
+      };
+      await persistAppointment(appointmentToSave);
+      return res.status(200).json({ success: true, message: 'Agendamento salvo pelo administrador.', appointment: appointmentToSave });
     }
 
     // --- REQUISIÇÃO PÚBLICA / ANÔNIMA ---
     // 1. PREVENÇÃO DE SOBRESCRITA: Rejeitar se o ID fornecido já existir no sistema
-    if (body.id && typeof body.id === 'string' && existing.some((a) => a.id === body.id)) {
-      return res.status(409).json({
-        success: false,
-        error: 'Identificador já existente. Operações públicas não podem sobrescrever registros.'
-      });
+    if (body.id && typeof body.id === 'string') {
+      const existing = await getAppointmentById(body.id);
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          error: 'Identificador já existente. Operações públicas não podem sobrescrever registros.'
+        });
+      }
     }
 
     // 2. Validação estrita de tipos e limites para campos públicos esperados
@@ -405,24 +662,46 @@ app.post('/api/appointments', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Horário inválido. Formato esperado: HH:mm.' });
     }
 
-    // 3. Validação de colisão de horário no servidor
-    const isSlotOccupied = existing.some(
-      (a) => a && a.status !== 'cancelled' && a.date === date && a.time === time
-    );
-    if (isSlotOccupied) {
+    // 3. Validação de colisão de horário no servidor (SSOT)
+    const slotOccupied = await isSlotTaken(date, time);
+    if (slotOccupied) {
       return res.status(409).json({
         success: false,
         error: 'Este horário já se encontra reservado. Por favor, selecione outro horário.'
       });
     }
 
-    // 4. Construção explícita de objeto higienizado (IGNORANDO adminNotes, diagnosticNotes, flags)
+    // 4. Validação de bloqueios administrativos na mesma fonte de dados
+    const slotBlocked = await isSlotAdminBlocked(date, time);
+    if (slotBlocked) {
+      return res.status(409).json({
+        success: false,
+        error: 'A data ou horário selecionado está temporariamente bloqueado pela administração.'
+      });
+    }
+
+    // 5. Construção explícita de objeto higienizado com Token Criptografado (SHA-256)
     const trustedId = (body.id && typeof body.id === 'string' && /^[a-zA-Z0-9_-]{3,128}$/.test(body.id))
       ? body.id
       : `meet-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
+    const clientProvidedToken = (typeof body.manageToken === 'string' && body.manageToken.trim().length >= 16)
+      ? body.manageToken.trim()
+      : null;
+    const rawManageToken = clientProvidedToken || `tok_live_${Date.now().toString(36)}_${crypto.randomBytes(24).toString('hex')}`;
+    const tokenHash = hashToken(rawManageToken);
+
+    // Validade de 30 dias ou data do evento + 24 horas
+    const meetingDateTime = new Date(`${date}T${time}:00`);
+    const tokenExpiresAt = !isNaN(meetingDateTime.getTime())
+      ? new Date(meetingDateTime.getTime() + 24 * 60 * 60 * 1000).toISOString()
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
     const sanitizedAppointment = {
       id: trustedId,
+      tokenHash, // Apenas o hash SHA-256 é armazenado no Firestore, nunca o segredo em texto puro
+      tokenCreatedAt: new Date().toISOString(),
+      tokenExpiresAt,
       clientName,
       clientEmail,
       clientPhone,
@@ -436,19 +715,28 @@ app.post('/api/appointments', async (req, res) => {
       confidentialityAccepted: Boolean(body.confidentialityAccepted)
     };
 
-    existing.unshift(sanitizedAppointment);
-    current.appointments = existing;
-    saveServerAppData(current);
+    const isSaved = await persistAppointment(sanitizedAppointment);
+    if (!isSaved) {
+      return res.status(500).json({ success: false, error: 'Falha ao persistir agendamento no armazenamento do servidor.' });
+    }
 
-    // 5. Disparo interno seguro do e-mail oficial (sem relay aberto)
-    sendServerAppointmentEmail(sanitizedAppointment).catch((err) => {
+    // 6. Disparo interno seguro do e-mail oficial (sem relay aberto)
+    sendServerAppointmentEmail({
+      ...sanitizedAppointment,
+      manageToken: rawManageToken
+    }).catch((err) => {
       console.warn('[Email Trigger] Falha no disparo do e-mail de agendamento:', err?.message);
     });
+
+    // Remove tokenHash do objeto de retorno para não expor à resposta pública
+    const clientResponseAppt = { ...sanitizedAppointment };
+    delete (clientResponseAppt as any).tokenHash;
 
     return res.status(201).json({
       success: true,
       message: 'Agendamento registrado com sucesso.',
-      appointment: sanitizedAppointment
+      appointment: clientResponseAppt,
+      manageToken: rawManageToken // Retornado uma única vez para o titular guardar na sessão
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
@@ -456,12 +744,13 @@ app.post('/api/appointments', async (req, res) => {
 });
 
 // Excluir agendamento (REQUER ADMIN)
-app.delete('/api/appointments/:id', requireAdminAuth, (req, res) => {
+app.delete('/api/appointments/:id', requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const current = getServerAppData();
-    current.appointments = (current.appointments || []).filter((a) => a.id !== id);
-    saveServerAppData(current);
+    const isDeleted = await deleteAppointmentFromStore(id);
+    if (!isDeleted) {
+      return res.status(500).json({ success: false, error: 'Falha ao excluir agendamento no servidor.' });
+    }
     return res.status(200).json({ success: true, message: 'Agendamento excluído pelo administrador.' });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
@@ -475,9 +764,7 @@ app.post('/api/appointments/resend-confirmation', async (req, res) => {
     if (!appointmentId || typeof appointmentId !== 'string') {
       return res.status(400).json({ success: false, error: 'Identificador do agendamento é obrigatório.' });
     }
-    const current = getServerAppData();
-    const existing = current.appointments || [];
-    const appointment = existing.find((a) => a.id === appointmentId);
+    const appointment = await getAppointmentById(appointmentId);
     if (!appointment) {
       return res.status(404).json({ success: false, error: 'Agendamento não encontrado.' });
     }
@@ -492,110 +779,315 @@ app.post('/api/appointments/resend-confirmation', async (req, res) => {
   }
 });
 
-// Notificação oficial de reagendamento pelo servidor (SEGURO: SEM OPEN RELAY)
-app.post('/api/appointments/reschedule-notification', async (req, res) => {
+// Recuperação segura de acesso ao agendamento por e-mail (TIMING-SAFE / ANTI-ENUMERAÇÃO)
+app.post('/api/appointments/request-access', async (req, res) => {
   try {
-    const { appointmentId, newDate, newTime } = req.body;
-    if (!appointmentId || typeof appointmentId !== 'string') {
-      return res.status(400).json({ success: false, error: 'Identificador do agendamento é obrigatório.' });
-    }
-    const current = getServerAppData();
-    const existing = current.appointments || [];
-    const appointment = existing.find((a) => a.id === appointmentId);
-    if (!appointment) {
-      return res.status(404).json({ success: false, error: 'Agendamento não encontrado.' });
+    const { clientEmail } = req.body;
+    if (!clientEmail || typeof clientEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim())) {
+      return res.status(400).json({ success: false, error: 'E-mail válido é obrigatório.' });
     }
 
-    const config = getServerConfig();
-    const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
-    const gmailPass = (rawPass || '').replace(/\s+/g, '');
+    const emailNorm = clientEmail.trim().toLowerCase();
+    const all = await getAllAppointments();
+    const clientAppts = all.filter(
+      (a) => a && a.clientEmail && a.clientEmail.toLowerCase() === emailNorm && a.status !== 'cancelled'
+    );
 
-    if (!gmailPass) {
-      return res.status(200).json({ success: false, requiresAppPassword: true });
+    if (clientAppts.length > 0) {
+      const targetAppt = clientAppts[0];
+      const newRawToken = `tok_live_${Date.now().toString(36)}_${crypto.randomBytes(24).toString('hex')}`;
+      const newTokenHash = hashToken(newRawToken);
+
+      targetAppt.tokenHash = newTokenHash;
+      targetAppt.tokenCreatedAt = new Date().toISOString();
+      await persistAppointment(targetAppt);
+
+      const dateFormatted = targetAppt.date.split('-').reverse().join('/');
+      const manageUrl = `${req.protocol}://${req.get('host')}/?manage_id=${targetAppt.id}&token=${newRawToken}#meeting`;
+
+      const config = getServerConfig();
+      const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
+      const gmailPass = (rawPass || '').replace(/\s+/g, '');
+
+      if (gmailPass) {
+        try {
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
+          });
+          await transporter.sendMail({
+            from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
+            to: targetAppt.clientEmail,
+            subject: `Acesso ao seu Agendamento: Bee-ginning 4 you (${dateFormatted} às ${targetAppt.time})`,
+            text: `Olá, ${targetAppt.clientName}!\n\nRecebemos uma solicitação de acesso para o gerenciamento da sua reunião virtual marcada para ${dateFormatted} às ${targetAppt.time}.\n\nPara visualizar, reagendar ou cancelar sua reunião com total segurança, acesse o link abaixo:\n${manageUrl}\n\nSe você não solicitou este acesso, ignore esta mensagem.\n\nAtenciosamente,\nEquipe Bee-ginning 4 you`
+          });
+        } catch (emailErr: any) {
+          console.warn('[Email Service] Falha ao enviar link de recuperação de agendamento:', emailErr?.message);
+        }
+      }
     }
 
-    const targetDate = newDate || appointment.date;
-    const targetTime = newTime || appointment.time;
-    const dateFormatted = targetDate.split('-').reverse().join('/');
-    const subject = `Reagendamento de Reunião: Beeginning 4 you (Novo horário: ${dateFormatted} às ${targetTime})`;
-    const text =
-      `Olá, ${appointment.clientName}!\n\n` +
-      `Confirmamos que a sua reunião com a Beeginning 4 you (${OFFICIAL_EMAIL}) foi reagendada com sucesso:\n\n` +
-      `📅 NOVA DATA: ${dateFormatted}\n` +
-      `⏰ NOVO HORÁRIO: ${targetTime} (Horário de Brasília)\n` +
-      `⏳ Duração: 45 minutos\n` +
-      `💻 Sala Virtual Google Meet: ${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}\n\n` +
-      `🔒 Compromisso de Sigilo e LGPD:\n` +
-      `Todas as informações e ideias compartilhadas permanecem sob absoluto sigilo comercial e em conformidade com a LGPD.\n\n` +
-      `Atenciosamente,\n` +
-      `Equipe Beeginning 4 you\n` +
-      `${OFFICIAL_EMAIL}`;
-
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
+    // Mensagem genérica segura (previne enumeração de usuários)
+    return res.status(200).json({
+      success: true,
+      message: 'Se houver agendamentos ativos para este e-mail, as instruções de acesso e o link de gerenciamento foram enviados.'
     });
-
-    const info = await transporter.sendMail({
-      from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
-      to: appointment.clientEmail,
-      subject,
-      text
-    });
-
-    return res.status(200).json({ success: true, messageId: info.messageId });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
   }
 });
 
-// Notificação oficial de cancelamento pelo servidor (SEGURO: SEM OPEN RELAY)
-app.post('/api/appointments/cancel-notification', async (req, res) => {
+// Notificação e persistência oficial de reagendamento pelo servidor (AUTORIZAÇÃO VERIFICÁVEL + ANTI-COLISÃO)
+app.post('/api/appointments/reschedule-notification', async (req, res) => {
   try {
-    const { appointmentId } = req.body;
+    const { appointmentId, newDate, newTime } = req.body;
     if (!appointmentId || typeof appointmentId !== 'string') {
-      return res.status(400).json({ success: false, error: 'Identificador do agendamento é obrigatório.' });
+      return res.status(400).json({ success: false, persisted: false, error: 'Identificador do agendamento é obrigatório.' });
     }
-    const current = getServerAppData();
-    const existing = current.appointments || [];
-    const appointment = existing.find((a) => a.id === appointmentId);
+    const appointment = await getAppointmentById(appointmentId);
     if (!appointment) {
-      return res.status(404).json({ success: false, error: 'Agendamento não encontrado.' });
+      return res.status(404).json({ success: false, persisted: false, error: 'Agendamento não encontrado.' });
     }
 
+    // 1. AUTORIZAÇÃO: Requer titular com token válido OU administradora autenticada
+    const authCheck = await verifyAppointmentAccess(req, appointment);
+    if (!authCheck.authorized) {
+      return res.status(authCheck.errorStatus || 403).json({
+        success: false,
+        persisted: false,
+        error: authCheck.errorMessage || 'Acesso negado. Apenas o titular autorizado ou a administradora podem reagendar.'
+      });
+    }
+
+    // 2. VALIDAÇÃO DOS PARÂMETROS DE REAGENDAMENTO
+    const targetDate = typeof newDate === 'string' ? newDate.trim() : '';
+    const targetTime = typeof newTime === 'string' ? newTime.trim() : '';
+
+    if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      return res.status(400).json({
+        success: false,
+        persisted: false,
+        error: 'Data inválida para reagendamento. Formato esperado: AAAA-MM-DD.'
+      });
+    }
+    if (!targetTime || !/^\d{2}:\d{2}$/.test(targetTime)) {
+      return res.status(400).json({
+        success: false,
+        persisted: false,
+        error: 'Horário inválido para reagendamento. Formato esperado: HH:mm.'
+      });
+    }
+
+    // 3. VALIDAÇÃO DE CONFLITO/COLISÃO DE HORÁRIO (BLOQUEIA HORÁRIO JÁ OCUPADO NO FIRESTORE/SSOT)
+    const slotOccupied = await isSlotTaken(targetDate, targetTime, appointment.id);
+    if (slotOccupied) {
+      return res.status(409).json({
+        success: false,
+        persisted: false,
+        error: 'O horário selecionado já se encontra reservado. Por favor, selecione outro horário.'
+      });
+    }
+
+    // 4. VALIDAÇÃO DE HORÁRIOS BLOQUEADOS PELA ADMINISTRAÇÃO
+    const slotBlocked = await isSlotAdminBlocked(targetDate, targetTime);
+    if (slotBlocked) {
+      return res.status(409).json({
+        success: false,
+        persisted: false,
+        error: 'A data ou horário selecionado está temporariamente bloqueado pela administração.'
+      });
+    }
+
+    // 5. ATUALIZAÇÃO DO AGENDAMENTO
+    const prevDate = appointment.date;
+    const prevTime = appointment.time;
+    appointment.date = targetDate;
+    appointment.time = targetTime;
+    appointment.status = 'rescheduled';
+    appointment.updatedAt = new Date().toISOString();
+    appointment.history = [
+      ...(appointment.history || []),
+      {
+        date: new Date().toISOString(),
+        action: `Reagendada de ${prevDate} ${prevTime} para ${targetDate} às ${targetTime} por ${authCheck.isAdmin ? 'administrador' : 'cliente'}`
+      }
+    ];
+
+    // 6. PERSISTÊNCIA DURÁVEL CONFIRMADA (FIRESTORE + ESPELHAMENTO)
+    const isPersisted = await persistAppointment(appointment);
+    if (!isPersisted) {
+      return res.status(500).json({
+        success: false,
+        persisted: false,
+        error: 'Falha ao salvar a alteração no armazenamento persistente do servidor.'
+      });
+    }
+
+    // 7. NOTIFICAÇÃO POR E-MAIL (se configurado)
     const config = getServerConfig();
     const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
     const gmailPass = (rawPass || '').replace(/\s+/g, '');
 
     if (!gmailPass) {
-      return res.status(200).json({ success: false, requiresAppPassword: true });
+      return res.status(200).json({
+        success: true,
+        persisted: true,
+        requiresAppPassword: true,
+        message: 'Reagendamento persistido com sucesso no servidor. Disparo de e-mail requer senha de aplicativo.',
+        appointment
+      });
     }
 
-    const dateFormatted = appointment.date.split('-').reverse().join('/');
-    const subject = `Cancelamento de Reunião: Beeginning 4 you (${dateFormatted} às ${appointment.time})`;
-    const text =
-      `Olá, ${appointment.clientName}!\n\n` +
-      `Confirmamos que a sua reunião com a equipe da Beeginning 4 you (${OFFICIAL_EMAIL}), anteriormente agendada para ${dateFormatted} às ${appointment.time}, foi cancelada conforme solicitado.\n\n` +
-      `Caso queira reagendar no futuro ou prefira conversar via WhatsApp (5511986297916), estamos sempre à sua disposição.\n\n` +
-      `Atenciosamente,\n` +
-      `Equipe Beeginning 4 you\n` +
-      `${OFFICIAL_EMAIL}`;
+    try {
+      const dateFormatted = targetDate.split('-').reverse().join('/');
+      const subject = `Reagendamento de Reunião: Beeginning 4 you (Novo horário: ${dateFormatted} às ${targetTime})`;
+      const text =
+        `Olá, ${appointment.clientName}!\n\n` +
+        `Confirmamos que a sua reunião com a Beeginning 4 you (${OFFICIAL_EMAIL}) foi reagendada com sucesso:\n\n` +
+        `📅 NOVA DATA: ${dateFormatted}\n` +
+        `⏰ NOVO HORÁRIO: ${targetTime} (Horário de Brasília)\n` +
+        `⏳ Duração: 45 minutos\n` +
+        `💻 Sala Virtual Google Meet: ${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}\n\n` +
+        `🔒 Compromisso de Sigilo e LGPD:\n` +
+        `Todas as informações e ideias compartilhadas permanecem sob absoluto sigilo comercial e em conformidade com a LGPD.\n\n` +
+        `Atenciosamente,\n` +
+        `Equipe Beeginning 4 you\n` +
+        `${OFFICIAL_EMAIL}`;
 
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
-    });
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
+      });
 
-    const info = await transporter.sendMail({
-      from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
-      to: appointment.clientEmail,
-      subject,
-      text
-    });
+      const info = await transporter.sendMail({
+        from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
+        to: appointment.clientEmail,
+        subject,
+        text
+      });
 
-    return res.status(200).json({ success: true, messageId: info.messageId });
+      return res.status(200).json({
+        success: true,
+        persisted: true,
+        messageId: info.messageId,
+        appointment,
+        message: 'Reagendamento confirmado e persistido com sucesso.'
+      });
+    } catch (emailErr: any) {
+      console.warn('[Email Service] Falha ao enviar e-mail de reagendamento:', emailErr?.message);
+      return res.status(200).json({
+        success: true,
+        persisted: true,
+        emailError: emailErr?.message,
+        appointment,
+        message: 'Reagendamento persistido com sucesso no servidor (falha no envio do e-mail).'
+      });
+    }
   } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message });
+    return res.status(500).json({ success: false, persisted: false, error: err?.message });
+  }
+});
+
+// Notificação e persistência oficial de cancelamento pelo servidor (AUTORIZAÇÃO VERIFICÁVEL + GRAVAÇÃO DURÁVEL)
+app.post('/api/appointments/cancel-notification', async (req, res) => {
+  try {
+    const { appointmentId } = req.body;
+    if (!appointmentId || typeof appointmentId !== 'string') {
+      return res.status(400).json({ success: false, persisted: false, error: 'Identificador do agendamento é obrigatório.' });
+    }
+    const appointment = await getAppointmentById(appointmentId);
+    if (!appointment) {
+      return res.status(404).json({ success: false, persisted: false, error: 'Agendamento não encontrado.' });
+    }
+
+    // 1. AUTORIZAÇÃO: Requer titular com token válido OU administradora autenticada
+    const authCheck = await verifyAppointmentAccess(req, appointment);
+    if (!authCheck.authorized) {
+      return res.status(authCheck.errorStatus || 403).json({
+        success: false,
+        persisted: false,
+        error: authCheck.errorMessage || 'Acesso negado. Apenas o titular autorizado ou a administradora podem cancelar.'
+      });
+    }
+
+    // 2. ATUALIZAÇÃO DO STATUS PARA CANCELADO
+    appointment.status = 'cancelled';
+    appointment.updatedAt = new Date().toISOString();
+    appointment.history = [
+      ...(appointment.history || []),
+      {
+        date: new Date().toISOString(),
+        action: `Reunião cancelada por ${authCheck.isAdmin ? 'administrador' : 'cliente'}`
+      }
+    ];
+
+    // 3. PERSISTÊNCIA DURÁVEL CONFIRMADA (FIRESTORE + ESPELHAMENTO)
+    const isPersisted = await persistAppointment(appointment);
+    if (!isPersisted) {
+      return res.status(500).json({
+        success: false,
+        persisted: false,
+        error: 'Falha ao salvar o cancelamento no armazenamento persistente do servidor.'
+      });
+    }
+
+    // 4. NOTIFICAÇÃO POR E-MAIL (se configurado)
+    const config = getServerConfig();
+    const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
+    const gmailPass = (rawPass || '').replace(/\s+/g, '');
+
+    if (!gmailPass) {
+      return res.status(200).json({
+        success: true,
+        persisted: true,
+        requiresAppPassword: true,
+        message: 'Cancelamento persistido no servidor. Disparo de e-mail requer senha de aplicativo.',
+        appointment
+      });
+    }
+
+    try {
+      const dateFormatted = appointment.date.split('-').reverse().join('/');
+      const subject = `Cancelamento de Reunião: Beeginning 4 you (${dateFormatted} às ${appointment.time})`;
+      const text =
+        `Olá, ${appointment.clientName}!\n\n` +
+        `Confirmamos que a sua reunião com a equipe da Beeginning 4 you (${OFFICIAL_EMAIL}), anteriormente agendada para ${dateFormatted} às ${appointment.time}, foi cancelada conforme solicitado.\n\n` +
+        `Caso queira reagendar no futuro ou prefira conversar via WhatsApp (5511986297916), estamos sempre à sua disposição.\n\n` +
+        `Atenciosamente,\n` +
+        `Equipe Beeginning 4 you\n` +
+        `${OFFICIAL_EMAIL}`;
+
+      const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
+      });
+
+      const info = await transporter.sendMail({
+        from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
+        to: appointment.clientEmail,
+        subject,
+        text
+      });
+
+      return res.status(200).json({
+        success: true,
+        persisted: true,
+        messageId: info.messageId,
+        appointment,
+        message: 'Cancelamento confirmado e persistido com sucesso.'
+      });
+    } catch (emailErr: any) {
+      console.warn('[Email Service] Falha ao enviar e-mail de cancelamento:', emailErr?.message);
+      return res.status(200).json({
+        success: true,
+        persisted: true,
+        emailError: emailErr?.message,
+        appointment,
+        message: 'Cancelamento persistido com sucesso no servidor (falha no envio do e-mail).'
+      });
+    }
+  } catch (err: any) {
+    return res.status(500).json({ success: false, persisted: false, error: err?.message });
   }
 });
 

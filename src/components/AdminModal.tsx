@@ -508,7 +508,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
       }
     };
 
-    saveAppointmentWithDiagnostic(updatedMeeting);
+    saveAppointmentWithDiagnostic(updatedMeeting, adminIdToken);
     setSelectedMeeting(updatedMeeting);
     setAppointments(getAdminAppointments());
     setDemands(getAllDemandForms());
@@ -524,7 +524,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
       status,
       updatedAt: new Date().toISOString()
     };
-    saveAppointmentWithDiagnostic(updated);
+    saveAppointmentWithDiagnostic(updated, adminIdToken);
     if (selectedMeeting?.id === meetingId) {
       setSelectedMeeting(updated);
     }
@@ -533,7 +533,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
   const handleDeleteMeeting = (meetingId: string) => {
     if (!window.confirm('Tem certeza que deseja excluir esta reunião e os registros associados?')) return;
-    deleteAppointmentInStorage(meetingId);
+    deleteAppointmentInStorage(meetingId, adminIdToken);
     const remaining = getAdminAppointments();
     setAppointments(remaining);
     setDemands(getAllDemandForms());
