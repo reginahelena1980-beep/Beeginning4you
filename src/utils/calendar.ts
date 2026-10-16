@@ -290,10 +290,23 @@ export async function sendOfficialConfirmationEmail(
   `;
 
   try {
+    const manageToken =
+      appointment.manageToken ||
+      (typeof window !== 'undefined'
+        ? sessionStorage.getItem(`appt_token_${appointment.id}`) || localStorage.getItem(`appt_token_${appointment.id}`)
+        : '') ||
+      '';
+
     const res = await fetch('/api/appointments/resend-confirmation', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appointmentId: appointment.id })
+      headers: {
+        'Content-Type': 'application/json',
+        ...(manageToken ? { 'x-appointment-token': manageToken } : {})
+      },
+      body: JSON.stringify({
+        appointmentId: appointment.id,
+        manageToken
+      })
     });
     const data = await res.json();
     return { success: !!data?.success, message: data?.message || data?.error };

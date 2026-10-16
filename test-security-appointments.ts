@@ -1,10 +1,13 @@
 import fetch from 'node:http';
 
+const testSuiteIp = `198.51.100.${Math.floor(Math.random() * 200) + 1}`;
+
 async function request(urlPath: string, options: { method: string; headers?: Record<string, string>; body?: any }) {
   const res = await globalThis.fetch(`http://127.0.0.1:3000${urlPath}`, {
     method: options.method,
     headers: {
       'Content-Type': 'application/json',
+      'X-Forwarded-For': testSuiteIp,
       ...(options.headers || {})
     },
     body: options.body ? JSON.stringify(options.body) : undefined

@@ -32,8 +32,6 @@ import {
   Loader2,
   Key,
   Ban,
-  Check,
-  Copy,
   ShieldAlert,
   CloudUpload,
   RefreshCw,
@@ -105,7 +103,6 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [newBlockReason, setNewBlockReason] = useState<string>('');
   const [newCustomSlot, setNewCustomSlot] = useState<string>('');
   const [cloudSyncStatus, setCloudSyncStatus] = useState<'checking' | 'connected' | 'rules_needed'>('checking');
-  const [copiedRules, setCopiedRules] = useState<boolean>(false);
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
   const [cloudSyncSuccessMsg, setCloudSyncSuccessMsg] = useState<string>('');
   
@@ -1723,73 +1720,28 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                         </div>
                         <div className="space-y-1 flex-1">
                           <h5 className="text-sm font-bold text-amber-950">
-                            Atenção para Visitantes e Outros Dispositivos (Regras do Firebase)
+                            Status de Sincronização Segura com Firebase
                           </h5>
                           <p className="text-xs text-amber-900 leading-relaxed">
-                            Suas alterações de horários e folgas estão salvas no seu navegador, porém seu banco de dados na nuvem (<strong>Firebase Firestore</strong>) está com as permissões de leitura bloqueadas por padrão no Console do Firebase. Por isso, <strong>visitantes em outro computador ou celular ainda não conseguem carregar seus bloqueios</strong>.
+                            A sincronização direta com o Firestore para carregar as configurações públicas de disponibilidade ainda não foi concluída ou as permissões de nuvem estão aguardando validação de sessão.
                           </p>
                         </div>
                       </div>
 
                       <div className="bg-white p-4 rounded-xl border border-amber-200 space-y-2.5 text-xs text-neutral-800">
                         <p className="font-bold text-[#1E3A47]">
-                          👉 Como liberar a visualização pública para todos os visitantes em 30 segundos:
+                          Sincronização Segura & Regras do Firebase:
                         </p>
-                        <ol className="list-decimal list-inside space-y-1.5 text-xs text-neutral-700 leading-relaxed">
-                          <li>
-                            Acesse a aba de Regras no Console do Firebase:{' '}
-                            <a
-                              href="https://console.firebase.google.com/project/beegining4you/firestore/rules"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 font-bold text-[#1E3A47] underline hover:text-[#D99B26]"
-                            >
-                              <span>Abrir Firebase Console Rules (beegining4you)</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </li>
-                          <li>Substitua o conteúdo da caixa de texto pelo código de segurança oficial abaixo:</li>
-                          <div className="relative my-2">
-                            <pre className="p-3 bg-neutral-900 text-emerald-400 font-mono text-[11px] rounded-lg overflow-x-auto leading-tight select-all">
-{`rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /settings/{settingId} { allow read, write: if true; }
-    match /demands/{demandId} { allow read, write: if true; }
-    match /appointments/{appointmentId} { allow read, write: if true; }
-    match /{document=**} { allow read, write: if false; }
-  }
-}`}
-                            </pre>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const rulesText = `rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /settings/{settingId} { allow read, write: if true; }\n    match /demands/{demandId} { allow read, write: if true; }\n    match /appointments/{appointmentId} { allow read, write: if true; }\n    match /{document=**} { allow read, write: if false; }\n  }\n}`;
-                                navigator.clipboard.writeText(rulesText);
-                                setCopiedRules(true);
-                                setTimeout(() => setCopiedRules(false), 4000);
-                              }}
-                              className="absolute top-2 right-2 px-2.5 py-1 rounded bg-white hover:bg-neutral-100 text-neutral-800 text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer"
-                            >
-                              {copiedRules ? (
-                                <>
-                                  <Check className="w-3 h-3 text-emerald-600" />
-                                  <span className="text-emerald-700">Copiado!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy className="w-3 h-3 text-neutral-600" />
-                                  <span>Copiar Código</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
-                          <li>Clique no botão azul <strong>Publicar (Publish)</strong> no topo do Firebase Console.</li>
-                        </ol>
+                        <p className="text-xs text-neutral-700 leading-relaxed">
+                          O sistema opera com regras de segurança estritas e controladas. Todas as permissões de acesso ao banco de dados e armazenamento em nuvem são aplicadas de forma segura através do pipeline oficial, garantindo que dados confidenciais fiquem protegidos e que apenas a conta oficial autorizada do administrador possa alterar configurações.
+                        </p>
+                        <p className="text-xs text-neutral-700 leading-relaxed">
+                          Caso tenha ocorrido alguma alteração recente nas credenciais ou regras do Firebase, aguarde a propagação ou clique no botão abaixo para testar a conexão novamente.
+                        </p>
 
-                        <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
                           <span className="text-[11px] text-neutral-500">
-                            Assim que você publicar no console, o status abaixo passará a verde automaticamente.
+                            Assim que a conexão for validada, o status passará a verde automaticamente.
                           </span>
                           <button
                             type="button"

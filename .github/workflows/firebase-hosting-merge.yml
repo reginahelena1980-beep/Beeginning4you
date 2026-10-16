@@ -16,8 +16,7 @@ jobs:
           credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_BEEGINNING4YOU }}'
       - name: Deploy Firestore Security Rules
         run: npx --yes firebase-tools deploy --only firestore:rules --project beegining4you
-      - name: Deploy Storage Security Rules (Non-blocking)
-        continue-on-error: true
+      - name: Deploy Storage Security Rules
         run: npx --yes firebase-tools deploy --only storage --project beegining4you
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
