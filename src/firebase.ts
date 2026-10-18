@@ -17,13 +17,13 @@ import { ContactConfig, DemandForm, MeetingAppointment } from './types';
 
 // Provided Firebase credentials for Beeginning 4 you
 export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDVXVS2FzKaGZcn3IALp5av6WDZaN_2vsc",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "beegining4you.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "beegining4you",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "beegining4you.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "14993501241",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:14993501241:web:f8697fb01d54f99864b1e8",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-MQNEB7WND8"
+  apiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_API_KEY) || "AIzaSyDVXVS2FzKaGZcn3IALp5av6WDZaN_2vsc",
+  authDomain: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN) || "beegining4you.firebaseapp.com",
+  projectId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_PROJECT_ID) || "beegining4you",
+  storageBucket: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET) || "beegining4you.firebasestorage.app",
+  messagingSenderId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID) || "14993501241",
+  appId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_APP_ID) || "1:14993501241:web:f8697fb01d54f99864b1e8",
+  measurementId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_MEASUREMENT_ID) || "G-MQNEB7WND8"
 };
 
 // Initialize Firebase App (singleton pattern)

@@ -288,20 +288,30 @@ export default function ConversationModal({
     const appointmentWithToken = res.appointment;
     setLastBookedMeeting(appointmentWithToken);
     setBookingSuccess(true);
-    setActionNotice('');
 
-    // Trigger official confirmation email dispatch directly from beeginning4you@gmail.com
-    sendOfficialConfirmationEmail(appointmentWithToken, isEn);
+    // Apresenta o status real do envio de e-mail retornado pelo servidor (disparo único)
+    if (res.emailSent) {
+      setActionNotice(
+        isEn
+          ? `Official confirmation email sent to ${appointmentWithToken.clientEmail}.`
+          : `E-mail de confirmação oficial enviado para ${appointmentWithToken.clientEmail}.`
+      );
+    } else if (res.emailNotice) {
+      setActionNotice(res.emailNotice);
+    } else {
+      setActionNotice('');
+    }
   };
 
   // Helper to re-send appointment confirmation to client via Official Email
   const handleSendToClientEmail = async () => {
     if (!lastBookedMeeting) return;
+    setActionNotice(isEn ? 'Sending confirmation email...' : 'Enviando e-mail de confirmação...');
     const res = await sendOfficialConfirmationEmail(lastBookedMeeting, isEn);
     setActionNotice(
       res.success
         ? (isEn ? `Confirmation email resent to ${lastBookedMeeting.clientEmail}.` : `E-mail de confirmação reenviado para ${lastBookedMeeting.clientEmail}.`)
-        : (isEn ? `Dispatch triggered. Please verify your inbox.` : `Disparo acionado para ${lastBookedMeeting.clientEmail}.`)
+        : (res.message || (isEn ? `Could not send email. Please check server credentials.` : `Não foi possível enviar o e-mail pelo servidor.`))
     );
   };
 

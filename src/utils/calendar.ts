@@ -68,47 +68,107 @@ export function getSavedAppointments(): MeetingAppointment[] {
   return [];
 }
 
+/**
+ * Cliente HTTP seguro que garante tratamento resiliente de respostas:
+ * - Valida Content-Type (application/json) antes de invocar .json()
+ * - Trata de forma segura respostas HTML ou texto puro (ex: fallbacks de hosting, 404, 405, 502)
+ * - Impede o erro técnico 'Unexpected token T ... is not valid JSON' de atingir o usuário
+ */
+export async function safeFetchJson<T = any>(
+  url: string,
+  options?: RequestInit
+): Promise<{ ok: boolean; status: number; data?: T; error?: string }> {
+  try {
+    const res = await fetch(url, options);
+    const contentType = res.headers.get('content-type') || '';
+
+    if (contentType.toLowerCase().includes('application/json')) {
+      try {
+        const json = await res.json();
+        if (res.ok) {
+          return { ok: true, status: res.status, data: json };
+        }
+        return {
+          ok: false,
+          status: res.status,
+          data: json,
+          error: json?.error || json?.message || `Erro no processamento da solicitação (HTTP ${res.status}).`
+        };
+      } catch {
+        // Fallthrough se o JSON estiver truncado ou inválido
+      }
+    }
+
+    // Leitura segura do corpo textual quando a resposta não for JSON (HTML ou texto)
+    const rawText = await res.text().catch(() => '');
+    let safeMessage = 'Serviço de agendamento temporariamente indisponível. Por favor, tente novamente em instantes.';
+
+    if (res.status === 404) {
+      safeMessage = 'O serviço de agendamentos não foi encontrado na rota do servidor.';
+    } else if (res.status === 405) {
+      safeMessage = 'Método não permitido pela rota de agendamentos.';
+    } else if (res.status === 409) {
+      safeMessage = 'Este horário já se encontra reservado por outro cliente. Por favor, selecione outro horário.';
+    } else if (res.status === 429) {
+      safeMessage = 'Muitas tentativas em pouco tempo. Por favor, aguarde alguns instantes.';
+    } else if (res.status >= 500) {
+      safeMessage = 'Instabilidade temporária no servidor de agendamento. Seus dados estão seguros.';
+    } else if (rawText && !rawText.trim().startsWith('<') && rawText.length < 150) {
+      safeMessage = rawText.trim();
+    }
+
+    return {
+      ok: false,
+      status: res.status,
+      error: safeMessage
+    };
+  } catch (netErr: any) {
+    return {
+      ok: false,
+      status: 0,
+      error: 'Falha de comunicação com o servidor de agendamentos. Verifique sua conexão à internet.'
+    };
+  }
+}
+
 export async function saveAppointment(appointment: MeetingAppointment): Promise<{
   success: boolean;
   appointment: MeetingAppointment;
   manageToken?: string;
+  emailSent?: boolean;
+  emailNotice?: string;
   error?: string;
 }> {
-  try {
-    const res = await fetch('/api/appointments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ appointment })
-    });
-    const data = await res.json();
-    if (res.ok && data?.success) {
-      const savedAppt = data.appointment || appointment;
-      const token = data.manageToken;
-      if (typeof window !== 'undefined' && token && savedAppt.id) {
-        try {
-          sessionStorage.setItem(`appt_token_${savedAppt.id}`, token);
-          localStorage.setItem(`appt_token_${savedAppt.id}`, token);
-        } catch {}
-      }
-      notifyStorageChange();
-      return {
-        success: true,
-        appointment: { ...savedAppt, manageToken: token },
-        manageToken: token
-      };
+  const result = await safeFetchJson<any>('/api/appointments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ appointment })
+  });
+
+  if (result.ok && result.data?.success) {
+    const savedAppt = result.data.appointment || appointment;
+    const token = result.data.manageToken;
+    if (typeof window !== 'undefined' && token && savedAppt.id) {
+      try {
+        sessionStorage.setItem(`appt_token_${savedAppt.id}`, token);
+        localStorage.setItem(`appt_token_${savedAppt.id}`, token);
+      } catch {}
     }
+    notifyStorageChange();
     return {
-      success: false,
-      appointment,
-      error: data?.error || 'Não foi possível confirmar o agendamento.'
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      appointment,
-      error: err?.message || 'Erro ao conectar ao servidor de agendamentos.'
+      success: true,
+      appointment: { ...savedAppt, manageToken: token },
+      manageToken: token,
+      emailSent: Boolean(result.data.emailSent),
+      emailNotice: result.data.emailNotice
     };
   }
+
+  return {
+    success: false,
+    appointment,
+    error: result.error || 'Não foi possível confirmar o agendamento.'
+  };
 }
 
 export function cancelAppointmentInStorage(
@@ -297,7 +357,7 @@ export async function sendOfficialConfirmationEmail(
         : '') ||
       '';
 
-    const res = await fetch('/api/appointments/resend-confirmation', {
+    const result = await safeFetchJson<any>('/api/appointments/resend-confirmation', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -308,8 +368,10 @@ export async function sendOfficialConfirmationEmail(
         manageToken
       })
     });
-    const data = await res.json();
-    return { success: !!data?.success, message: data?.message || data?.error };
+    return {
+      success: Boolean(result.ok && result.data?.success),
+      message: result.data?.message || result.error || (isEn ? 'Could not resend email.' : 'Não foi possível reenviar o e-mail.')
+    };
   } catch (err: any) {
     console.warn('[Email Dispatch] Falha ao acionar confirmação no servidor', err);
     return { success: false, message: err?.message };
@@ -331,7 +393,7 @@ export async function sendOfficialRescheduleEmail(
       (typeof window !== 'undefined' ? sessionStorage.getItem(`appt_token_${appointment.id}`) : '') ||
       '';
 
-    const res = await fetch('/api/appointments/reschedule-notification', {
+    const result = await safeFetchJson<any>('/api/appointments/reschedule-notification', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -344,12 +406,11 @@ export async function sendOfficialRescheduleEmail(
         manageToken
       })
     });
-    const data = await res.json();
     return {
-      success: res.ok && !!data?.success && !!data?.persisted,
-      persisted: !!data?.persisted,
-      message: data?.message,
-      error: data?.error
+      success: Boolean(result.ok && result.data?.success && result.data?.persisted),
+      persisted: Boolean(result.data?.persisted),
+      message: result.data?.message,
+      error: result.error || result.data?.error
     };
   } catch (err: any) {
     console.warn('[Email Dispatch] Falha no backend ao notificar reagendamento', err);
@@ -370,7 +431,7 @@ export async function sendOfficialCancellationEmail(
       (typeof window !== 'undefined' ? sessionStorage.getItem(`appt_token_${appointment.id}`) : '') ||
       '';
 
-    const res = await fetch('/api/appointments/cancel-notification', {
+    const result = await safeFetchJson<any>('/api/appointments/cancel-notification', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -381,12 +442,11 @@ export async function sendOfficialCancellationEmail(
         manageToken
       })
     });
-    const data = await res.json();
     return {
-      success: res.ok && !!data?.success && !!data?.persisted,
-      persisted: !!data?.persisted,
-      message: data?.message,
-      error: data?.error
+      success: Boolean(result.ok && result.data?.success && result.data?.persisted),
+      persisted: Boolean(result.data?.persisted),
+      message: result.data?.message,
+      error: result.error || result.data?.error
     };
   } catch (err: any) {
     console.warn('[Email Dispatch] Falha no backend ao notificar cancelamento', err);
@@ -401,16 +461,16 @@ export async function requestAppointmentAccessByEmail(
   email: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    const res = await fetch('/api/appointments/request-access', {
+    const result = await safeFetchJson<any>('/api/appointments/request-access', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientEmail: email })
     });
-    const data = await res.json();
     return {
-      success: !!data?.success,
+      success: Boolean(result.ok && result.data?.success),
       message:
-        data?.message ||
+        result.data?.message ||
+        result.error ||
         'Se houver agendamentos associados a este e-mail, as instruções foram enviadas.'
     };
   } catch (err: any) {

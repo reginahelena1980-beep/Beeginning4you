@@ -14,7 +14,7 @@
     ],
     "rewrites": [
       {
-        "source": "**",
+        "regex": "^(?!/api(?:/|$)).*",
         "destination": "/index.html"
       }
     ]

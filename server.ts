@@ -323,18 +323,23 @@ if (!getApps().length) {
       console.log(`[Firebase Admin] SDK inicializado com conta de serviço para o projeto: ${FIREBASE_PROJECT_ID}`);
     } else if (
       canonicalServiceAccount &&
-      canonicalServiceAccount.includes('BEGIN PRIVATE KEY') &&
-      process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL
+      canonicalServiceAccount.includes('BEGIN PRIVATE KEY')
     ) {
+      const clientEmail =
+        process.env.FIREBASE_CLIENT_EMAIL ||
+        (process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL && process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL.includes(FIREBASE_PROJECT_ID)
+          ? process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL
+          : `firebase-adminsdk-fbsvc@${FIREBASE_PROJECT_ID}.iam.gserviceaccount.com`);
+
       firebaseAdminApp = initializeApp({
         credential: cert({
           projectId: FIREBASE_PROJECT_ID,
-          clientEmail: process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL,
+          clientEmail,
           privateKey: canonicalServiceAccount.replace(/\\n/g, '\n')
         }),
         projectId: FIREBASE_PROJECT_ID
       });
-      console.log(`[Firebase Admin] SDK inicializado com credenciais explícitas para: ${process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL}`);
+      console.log(`[Firebase Admin] SDK inicializado com credenciais explícitas para: ${clientEmail}`);
     } else {
       firebaseAdminApp = initializeApp({
         projectId: FIREBASE_PROJECT_ID
@@ -775,6 +780,7 @@ async function atomicCreateAppointment(sanitizedAppointment: any): Promise<{
 
     // 4. Gravação atômica transacional no Firestore (se conectado)
     let firestoreSaved = false;
+    let firestoreError: string | null = null;
     if (adminDb && isFirestoreAvailable) {
       try {
         await adminDb.runTransaction(async (transaction: any) => {
@@ -820,7 +826,16 @@ async function atomicCreateAppointment(sanitizedAppointment: any): Promise<{
             reason: 'Identificador já existente. Operações públicas não podem sobrescrever registros.'
           };
         }
-        console.warn('[Firestore Transaction] Falha na transação, aplicando fallback consistente:', transErr?.message);
+        firestoreError = transErr?.message || 'Falha na transação do Firestore';
+        console.warn('[Firestore Transaction] Falha na transação:', transErr?.message);
+      }
+
+      // Se o Firestore está disponível e a transação falhou, NUNCA mascara a falha com sucesso local!
+      if (!firestoreSaved) {
+        return {
+          success: false,
+          reason: `Não foi possível gravar o agendamento no Firestore: ${firestoreError || 'Erro desconhecido'}`
+        };
       }
     }
 
@@ -1337,7 +1352,8 @@ async function sendServerAppointmentEmail(appointment: {
     `A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018).\n\n` +
     `Atenciosamente,\n` +
     `Equipe Beeginning 4 you\n` +
-    `${OFFICIAL_EMAIL}`;
+    `E-mail: ${OFFICIAL_EMAIL}\n` +
+    `WhatsApp Oficial: (11) 98629-7916`;
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1A1A1A; max-width: 600px; margin: 0 auto; border: 1px solid #EAE6DF; border-radius: 12px; overflow: hidden;">
@@ -1361,7 +1377,8 @@ async function sendServerAppointmentEmail(appointment: {
         <p style="font-size: 13px; margin-top: 20px;">
           Aguardamos o nosso encontro!<br/>
           <strong>Equipe Bee-ginning 4 you</strong><br/>
-          <a href="mailto:${OFFICIAL_EMAIL}" style="color: #1E3A47;">${OFFICIAL_EMAIL}</a>
+          📧 <a href="mailto:${OFFICIAL_EMAIL}" style="color: #1E3A47;">${OFFICIAL_EMAIL}</a><br/>
+          📱 WhatsApp: <a href="https://wa.me/5511986297916" style="color: #1E3A47;">(11) 98629-7916</a>
         </p>
       </div>
     </div>
@@ -1514,13 +1531,20 @@ app.post('/api/appointments', createRateLimitMiddleware(appointmentCreateLimiter
       return res.status(500).json({ success: false, error: 'Falha ao persistir agendamento no armazenamento do servidor.' });
     }
 
-    // 5. Disparo interno seguro do e-mail oficial (sem relay aberto)
-    sendServerAppointmentEmail({
-      ...sanitizedAppointment,
-      manageToken: rawManageToken
-    }).catch((err) => {
-      console.warn('[Email Trigger] Falha no disparo do e-mail de agendamento:', err?.message);
-    });
+    // 5. Disparo interno seguro do e-mail oficial (disparo único e controlado)
+    let emailResult: { success: boolean; requiresAppPassword?: boolean; messageId?: string; error?: string } = {
+      success: false,
+      requiresAppPassword: false
+    };
+    try {
+      emailResult = await sendServerAppointmentEmail({
+        ...sanitizedAppointment,
+        manageToken: rawManageToken
+      });
+    } catch (mailErr: any) {
+      console.warn('[Email Trigger] Falha no disparo do e-mail de agendamento:', mailErr?.message);
+      emailResult = { success: false, requiresAppPassword: false, error: mailErr?.message };
+    }
 
     // Remove tokenHash do objeto de retorno para não expor internamente à resposta pública
     const clientResponseAppt = { ...sanitizedAppointment };
@@ -1530,7 +1554,13 @@ app.post('/api/appointments', createRateLimitMiddleware(appointmentCreateLimiter
       success: true,
       message: 'Agendamento registrado com sucesso.',
       appointment: clientResponseAppt,
-      manageToken: rawManageToken // Retornado uma única vez para o titular guardar na sessão
+      manageToken: rawManageToken, // Retornado uma única vez para o titular guardar na sessão
+      emailSent: Boolean(emailResult.success),
+      emailNotice: emailResult.success
+        ? 'E-mail de confirmação enviado com sucesso.'
+        : (emailResult.requiresAppPassword
+            ? 'Agendamento confirmado. O e-mail automático requer configuração de Senha de Aplicativo do Gmail no servidor.'
+            : 'Agendamento confirmado. O e-mail automático não pôde ser entregue no momento.')
     });
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message });
@@ -2153,7 +2183,10 @@ async function startServer() {
   } else {
     const distPath = path.resolve(__dirname, 'dist');
     app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
+    app.get('*', (req, res) => {
+      if (req.path.startsWith('/api')) {
+        return res.status(404).json({ success: false, error: 'Endpoint da API não encontrado.' });
+      }
       res.sendFile(path.resolve(distPath, 'index.html'));
     });
   }
