@@ -1,6 +1,35 @@
 {
   "appointments": [
     {
+      "id": "meet-1792428275370-hr0gy",
+      "tokenHash": "b07cb5ec8f1af10d37f3895f2a0d4398f94619e1fa18602c8c11d8d4d43a8e8d",
+      "tokenCreatedAt": "2026-10-19T16:44:35.370Z",
+      "tokenExpiresAt": "2027-04-18T14:00:00.000Z",
+      "clientName": "Dra. Mariana Vercel Test",
+      "clientEmail": "mariana.vercel@exemplo.com.br",
+      "clientPhone": "(11) 99888-7766",
+      "topic": "Diagnóstico de automação para escritório",
+      "date": "2027-05-15",
+      "time": "16:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "cancelled",
+      "createdAt": "2026-10-19T16:44:35.370Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhilt2_15f76f725c2b556f72597c6ee192aa19",
+      "updatedAt": "2026-10-19T16:44:37.669Z",
+      "history": [
+        {
+          "date": "2026-10-19T16:44:36.732Z",
+          "action": "Reagendada de 2027-04-17 14:00 para 2027-05-15 às 16:00 por cliente"
+        },
+        {
+          "date": "2026-10-19T16:44:37.669Z",
+          "action": "Reunião cancelada por cliente"
+        }
+      ]
+    },
+    {
       "id": "meet-1792337774164-3tx6z",
       "tokenHash": "c8e445b0ea9b1eace61dd957c8677f32378c6a1983485555382b9233fdf8c14f",
       "tokenCreatedAt": "2026-10-18T15:36:14.164Z",
