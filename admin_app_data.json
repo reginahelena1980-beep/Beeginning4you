@@ -1,6 +1,299 @@
 {
   "appointments": [
     {
+      "id": "race-user-a-mvfhw5as",
+      "tokenHash": "aa0c5c23061b1f172bd6477a9d5301279b737b3808972d05c46d791af8194038",
+      "tokenCreatedAt": "2026-10-19T16:55:12.802Z",
+      "tokenExpiresAt": "2029-06-20T16:00:00.000Z",
+      "clientName": "Cliente Concorrente A",
+      "clientEmail": "cliente.a@exemplo.com",
+      "clientPhone": "(11) 91111-1111",
+      "topic": "Assunto A",
+      "date": "2029-06-19",
+      "time": "16:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "confirmed",
+      "createdAt": "2026-10-19T16:55:12.802Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhw8mh_6a1fb5266f860728e1639a7ea3a7a411"
+    },
+    {
+      "id": "fase2-meet-mvfhw5as",
+      "tokenHash": "b4cbf2963764e34b1961b0b711765a18704bfc3199be0e50792daa7bfeb93d4b",
+      "tokenCreatedAt": "2026-10-19T16:55:08.579Z",
+      "tokenExpiresAt": "2027-03-23T14:00:00.000Z",
+      "clientName": "Dra. Mariana Silva",
+      "clientEmail": "mariana.silva.test@exemplo.com.br",
+      "clientPhone": "(11) 99876-5432",
+      "topic": "Estruturação de consultoria executiva",
+      "date": "2031-03-20",
+      "time": "10:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "cancelled",
+      "createdAt": "2026-10-19T16:55:08.579Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhw6o6_fe603bb0e268a7c47462a8ed3afaa9da",
+      "updatedAt": "2026-10-19T16:55:14.970Z",
+      "history": [
+        {
+          "date": "2026-10-19T16:55:13.870Z",
+          "action": "Reagendada de 2027-03-22 14:00 para 2031-03-20 às 10:00 por cliente"
+        },
+        {
+          "date": "2026-10-19T16:55:14.970Z",
+          "action": "Reunião cancelada por cliente"
+        }
+      ]
+    },
+    {
+      "id": "fase2-meet-mvfhvh5z",
+      "tokenHash": "faeeea07df1ed67543ba8cd907d7590d81bcd08454cc6a493388926b0e56acfa",
+      "tokenCreatedAt": "2026-10-19T16:54:37.307Z",
+      "tokenExpiresAt": "2027-03-11T14:00:00.000Z",
+      "clientName": "Dra. Mariana Silva",
+      "clientEmail": "mariana.silva.test@exemplo.com.br",
+      "clientPhone": "(11) 99876-5432",
+      "topic": "Estruturação de consultoria executiva",
+      "date": "2030-10-27",
+      "time": "10:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "cancelled",
+      "createdAt": "2026-10-19T16:54:37.307Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhvi5j_b9a98cf9c92a7509c551dd8e8b0bb7f4",
+      "updatedAt": "2026-10-19T16:54:44.631Z",
+      "history": [
+        {
+          "date": "2026-10-19T16:54:43.105Z",
+          "action": "Reagendada de 2027-03-10 14:00 para 2030-10-27 às 10:00 por cliente"
+        },
+        {
+          "date": "2026-10-19T16:54:44.631Z",
+          "action": "Reunião cancelada por cliente"
+        }
+      ]
+    },
+    {
+      "id": "test-meet-2-mvfhv1ol",
+      "tokenHash": "0c4026905aa404d652d3c91b59e7deb6fc986565633c9ce66aed8b0025719bd9",
+      "tokenCreatedAt": "2026-10-19T16:54:19.187Z",
+      "tokenExpiresAt": "2027-05-25T14:00:00.000Z",
+      "clientName": "Cliente Bob",
+      "clientEmail": "bob@exemplo.com",
+      "clientPhone": "(11) 93333-4444",
+      "topic": "Conversa inicial sobre ideia de negócio",
+      "date": "2027-05-24",
+      "time": "14:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "confirmed",
+      "createdAt": "2026-10-19T16:54:19.187Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhv3xc_945808359a1874a979bc02b2d68568a0"
+    },
+    {
+      "id": "test-meet-1-mvfhv1ol",
+      "tokenHash": "b378844cdd9c39577be4597b127019e58e3cd205e8895bf5cb80b1be8ae6324f",
+      "tokenCreatedAt": "2026-10-19T16:54:18.247Z",
+      "tokenExpiresAt": "2027-05-24T10:00:00.000Z",
+      "clientName": "Cliente Alice",
+      "clientEmail": "alice@exemplo.com",
+      "clientPhone": "(11) 91111-2222",
+      "topic": "Conversa inicial sobre ideia de negócio",
+      "date": "2027-05-25",
+      "time": "11:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "cancelled",
+      "createdAt": "2026-10-19T16:54:18.247Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhv38y_20ffd2949fba97a87cc609a81037ff62",
+      "updatedAt": "2026-10-19T16:54:20.878Z",
+      "history": [
+        {
+          "date": "2026-10-19T16:54:20.088Z",
+          "action": "Reagendada de 2027-05-23 10:00 para 2027-05-25 às 11:00 por cliente"
+        },
+        {
+          "date": "2026-10-19T16:54:20.878Z",
+          "action": "Reunião cancelada por cliente"
+        }
+      ]
+    },
+    {
+      "id": "meet-1792428848539-hufe1",
+      "tokenHash": "f1371aaf3fff63a1f10267029409564ea016618e762515a3b2f5e04db941e8f9",
+      "tokenCreatedAt": "2026-10-19T16:54:08.540Z",
+      "tokenExpiresAt": "2027-04-15T14:00:00.000Z",
+      "clientName": "Dra. Mariana Vercel Test",
+      "clientEmail": "mariana.vercel@exemplo.com.br",
+      "clientPhone": "(11) 99888-7766",
+      "topic": "Diagnóstico de automação para escritório",
+      "date": "2027-05-15",
+      "time": "16:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "cancelled",
+      "createdAt": "2026-10-19T16:54:08.540Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhuvt3_6ab90b328ac35d31d4c6176a4a077080",
+      "updatedAt": "2026-10-19T16:54:10.528Z",
+      "history": [
+        {
+          "date": "2026-10-19T16:54:09.575Z",
+          "action": "Reagendada de 2027-04-14 14:00 para 2027-05-15 às 16:00 por cliente"
+        },
+        {
+          "date": "2026-10-19T16:54:10.528Z",
+          "action": "Reunião cancelada por cliente"
+        }
+      ]
+    },
+    {
+      "id": "race-user-a-mvfhpdep",
+      "tokenHash": "4cfb2f7deda6a404f7c923c6a029a681072ab0c14f6a3fae044b368922f52301",
+      "tokenCreatedAt": "2026-10-19T16:49:56.425Z",
+      "tokenExpiresAt": "2029-08-01T16:00:00.000Z",
+      "clientName": "Cliente Concorrente A",
+      "clientEmail": "cliente.a@exemplo.com",
+      "clientPhone": "(11) 91111-1111",
+      "topic": "Assunto A",
+      "date": "2029-07-31",
+      "time": "16:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "confirmed",
+      "createdAt": "2026-10-19T16:49:56.426Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhpgi7_8807a0243672eb2df575b261ab28b5d7"
+    },
+    {
+      "id": "fase2-meet-mvfhpdep",
+      "tokenHash": "6eaee1f6ffd8f4c8284eefa86b3b52883bae5efdb2d0091e09ea80de4317a8b4",
+      "tokenCreatedAt": "2026-10-19T16:49:52.503Z",
+      "tokenExpiresAt": "2027-07-18T14:00:00.000Z",
+      "clientName": "Dra. Mariana Silva",
+      "clientEmail": "mariana.silva.test@exemplo.com.br",
+      "clientPhone": "(11) 99876-5432",
+      "topic": "Estruturação de consultoria executiva",
+      "date": "2031-04-04",
+      "time": "10:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "cancelled",
+      "createdAt": "2026-10-19T16:49:52.503Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhpe9q_b27725e3d00fe0a9a9062c7c677929be",
+      "updatedAt": "2026-10-19T16:49:58.439Z",
+      "history": [
+        {
+          "date": "2026-10-19T16:49:57.613Z",
+          "action": "Reagendada de 2027-07-17 14:00 para 2031-04-04 às 10:00 por cliente"
+        },
+        {
+          "date": "2026-10-19T16:49:58.439Z",
+          "action": "Reunião cancelada por cliente"
+        }
+      ]
+    },
+    {
+      "id": "meet-1792428575191-vj94z",
+      "tokenHash": "a075665563545f8d055312129c01b935eebc9813bab94ade58fd09307772d877",
+      "tokenCreatedAt": "2026-10-19T16:49:35.192Z",
+      "tokenExpiresAt": "2028-12-30T11:00:00.000Z",
+      "clientName": "Dra. Beatriz Santos",
+      "clientEmail": "beatriz.santos.test@exemplo.com.br",
+      "clientPhone": "(11) 98765-1234",
+      "topic": "Consultoria de Estruturação Digital e Processos",
+      "date": "2028-12-29",
+      "time": "11:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "confirmed",
+      "createdAt": "2026-10-19T16:49:35.192Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhp2cr_a612edc4a4cb8cf37d792b6e26c3fe56"
+    },
+    {
+      "id": "test-meet-2-mvfhon70",
+      "tokenHash": "a5f79a14ff3cf27092cdab238a15ce647645ca44a07d064395ba6c95419eb430",
+      "tokenCreatedAt": "2026-10-19T16:49:20.503Z",
+      "tokenExpiresAt": "2027-10-06T14:00:00.000Z",
+      "clientName": "Cliente Bob",
+      "clientEmail": "bob@exemplo.com",
+      "clientPhone": "(11) 93333-4444",
+      "topic": "Conversa inicial sobre ideia de negócio",
+      "date": "2027-10-05",
+      "time": "14:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "confirmed",
+      "createdAt": "2026-10-19T16:49:20.503Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhortf_87399cbc2a8f9ca3aef58eb5f88d8175"
+    },
+    {
+      "id": "test-meet-1-mvfhon70",
+      "tokenHash": "2cd13fa603478598295acd11950cc9d5b1d3b20998e1b668efbb9f26f6ac2a3a",
+      "tokenCreatedAt": "2026-10-19T16:49:19.529Z",
+      "tokenExpiresAt": "2027-10-05T10:00:00.000Z",
+      "clientName": "Cliente Alice",
+      "clientEmail": "alice@exemplo.com",
+      "clientPhone": "(11) 91111-2222",
+      "topic": "Conversa inicial sobre ideia de negócio",
+      "date": "2027-10-06",
+      "time": "11:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "cancelled",
+      "createdAt": "2026-10-19T16:49:19.529Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhoos7_60a079d1f15e3a4d0feec081b88fa559",
+      "updatedAt": "2026-10-19T16:49:25.549Z",
+      "history": [
+        {
+          "date": "2026-10-19T16:49:24.455Z",
+          "action": "Reagendada de 2027-10-04 10:00 para 2027-10-06 às 11:00 por cliente"
+        },
+        {
+          "date": "2026-10-19T16:49:25.549Z",
+          "action": "Reunião cancelada por cliente"
+        }
+      ]
+    },
+    {
+      "id": "meet-1792428548655-o9y4m",
+      "tokenHash": "2f0647f9011f304ebdece4ecae39bf58fef9b22befdebdef7fce206c4357de4d",
+      "tokenCreatedAt": "2026-10-19T16:49:08.655Z",
+      "tokenExpiresAt": "2027-04-20T14:00:00.000Z",
+      "clientName": "Dra. Mariana Vercel Test",
+      "clientEmail": "mariana.vercel@exemplo.com.br",
+      "clientPhone": "(11) 99888-7766",
+      "topic": "Diagnóstico de automação para escritório",
+      "date": "2027-05-15",
+      "time": "16:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "cancelled",
+      "createdAt": "2026-10-19T16:49:08.655Z",
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvfhogzs_959bc7f22e88533bee34cc99f1e3ff38",
+      "updatedAt": "2026-10-19T16:49:11.713Z",
+      "history": [
+        {
+          "date": "2026-10-19T16:49:10.441Z",
+          "action": "Reagendada de 2027-04-19 14:00 para 2027-05-15 às 16:00 por cliente"
+        },
+        {
+          "date": "2026-10-19T16:49:11.713Z",
+          "action": "Reunião cancelada por cliente"
+        }
+      ]
+    },
+    {
       "id": "meet-1792428275370-hr0gy",
       "tokenHash": "b07cb5ec8f1af10d37f3895f2a0d4398f94619e1fa18602c8c11d8d4d43a8e8d",
       "tokenCreatedAt": "2026-10-19T16:44:35.370Z",
@@ -1061,8 +1354,8 @@
     },
     {
       "id": "meet-1792099372228-f993k",
-      "tokenHash": "4846943594ba53ba55a067f24078fd87277c06560cfe463296bfd6093018781c",
-      "tokenCreatedAt": "2026-10-18T15:35:15.994Z",
+      "tokenHash": "be6f321ca6e52289d045cf5b3bc808e33c47454026a1682370d16e3e9551045c",
+      "tokenCreatedAt": "2026-10-19T16:54:21.873Z",
       "tokenExpiresAt": "2026-12-02T10:00:00.000Z",
       "clientName": "Test Alice",
       "clientEmail": "alice@exemplo.com",
@@ -1220,6 +1513,82 @@
     }
   ],
   "demands": [
+    {
+      "id": "dem-test-mvfhw5as",
+      "name": "Carlos Oliveira",
+      "businessName": "",
+      "segment": "",
+      "contactMethod": "whatsapp",
+      "contactValue": "",
+      "phone": "(11) 98765-4321",
+      "email": "carlos.oliveira@empresa.com.br",
+      "biggestNeed": "",
+      "businessDescription": "",
+      "projectStage": "",
+      "mainGoal": "",
+      "urgency": "media",
+      "origin": "site",
+      "source": "formulario_contato",
+      "status": "Novo",
+      "createdAt": "2026-10-19T16:55:15.777Z"
+    },
+    {
+      "id": "dem-test-mvfhvh5z",
+      "name": "Carlos Oliveira",
+      "businessName": "",
+      "segment": "",
+      "contactMethod": "whatsapp",
+      "contactValue": "",
+      "phone": "(11) 98765-4321",
+      "email": "carlos.oliveira@empresa.com.br",
+      "biggestNeed": "",
+      "businessDescription": "",
+      "projectStage": "",
+      "mainGoal": "",
+      "urgency": "media",
+      "origin": "site",
+      "source": "formulario_contato",
+      "status": "Novo",
+      "createdAt": "2026-10-19T16:54:45.752Z"
+    },
+    {
+      "id": "dem-test-mvfhpdep",
+      "name": "Carlos Oliveira",
+      "businessName": "",
+      "segment": "",
+      "contactMethod": "whatsapp",
+      "contactValue": "",
+      "phone": "(11) 98765-4321",
+      "email": "carlos.oliveira@empresa.com.br",
+      "biggestNeed": "",
+      "businessDescription": "",
+      "projectStage": "",
+      "mainGoal": "",
+      "urgency": "media",
+      "origin": "site",
+      "source": "formulario_contato",
+      "status": "Novo",
+      "createdAt": "2026-10-19T16:49:59.441Z"
+    },
+    {
+      "id": "demand-1792428579155-rous1",
+      "name": "Cliente Contato Teste",
+      "businessName": "",
+      "segment": "",
+      "contactMethod": "whatsapp",
+      "contactValue": "",
+      "phone": "(11) 97777-6666",
+      "email": "contato.teste@exemplo.com.br",
+      "biggestNeed": "Desenvolvimento de portal corporativo sob medida",
+      "businessDescription": "",
+      "projectStage": "rodando",
+      "mainGoal": "",
+      "urgency": "media",
+      "origin": "diagnostic_pedir",
+      "source": "formulario_contato",
+      "status": "Novo",
+      "createdAt": "2026-10-19T16:49:39.155Z"
+    },
     {
       "id": "dem-test-mvdzlubu",
       "name": "Carlos Oliveira",
