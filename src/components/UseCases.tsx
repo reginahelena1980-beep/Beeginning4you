@@ -1,4 +1,5 @@
-import { getRealProjectExamples } from '../data/content';
+import { useState, useEffect } from 'react';
+import { getStoredRealProjects, STORAGE_CHANGE_EVENT } from '../utils/adminStorage';
 import { useLanguage } from '../context/LanguageContext';
 import {
   Sparkles,
@@ -8,7 +9,12 @@ import {
   Workflow,
   Wallet,
   Calculator,
-  Globe
+  Globe,
+  Layers,
+  BarChart3,
+  Zap,
+  Smartphone,
+  CheckCircle2
 } from 'lucide-react';
 
 interface UseCasesProps {
@@ -18,7 +24,16 @@ interface UseCasesProps {
 export default function UseCases({ onSelectSolutionForContact: _onSelectSolutionForContact }: UseCasesProps) {
   const { language } = useLanguage();
   const isEn = language === 'en';
-  const projects = getRealProjectExamples(language);
+  const [projects, setProjects] = useState(() => getStoredRealProjects(language));
+
+  useEffect(() => {
+    const updateProjects = () => {
+      setProjects(getStoredRealProjects(language));
+    };
+    updateProjects();
+    window.addEventListener(STORAGE_CHANGE_EVENT, updateProjects);
+    return () => window.removeEventListener(STORAGE_CHANGE_EVENT, updateProjects);
+  }, [language]);
 
   const renderIcon = (iconName: string) => {
     const props = { className: 'w-4 h-4' };
@@ -33,10 +48,25 @@ export default function UseCases({ onSelectSolutionForContact: _onSelectSolution
         return <Calculator {...props} />;
       case 'Globe':
         return <Globe {...props} />;
+      case 'Sparkles':
+        return <Sparkles {...props} />;
+      case 'Layers':
+        return <Layers {...props} />;
+      case 'ShieldCheck':
+        return <ShieldCheck {...props} />;
+      case 'BarChart3':
+        return <BarChart3 {...props} />;
+      case 'Zap':
+        return <Zap {...props} />;
+      case 'Smartphone':
+        return <Smartphone {...props} />;
+      case 'CheckCircle2':
+        return <CheckCircle2 {...props} />;
       default:
         return <Workflow {...props} />;
     }
   };
+
 
   return (
     <section id="historias" className="py-12 sm:py-16 lg:py-20 bg-[#F9F9F8] relative scroll-mt-20">
@@ -65,30 +95,39 @@ export default function UseCases({ onSelectSolutionForContact: _onSelectSolution
         </div>
 
         {/* Delicate & Compact Real Projects Grid (Screenshot 8) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project, idx) => {
-            return (
-              <div
-                key={project.id}
-                id={`project-showcase-${project.id}`}
-                className="bg-white rounded-2xl border border-[#E8E8E5] hover:border-[#D99B26]/60 p-6 flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all duration-200 group"
-              >
-                <div className="space-y-4">
-                  {/* Header: Micro-Icon, Badge & Number */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-[#FAF8F5] group-hover:bg-[#E5A93B]/20 text-[#1E3A47] group-hover:text-[#8F6413] border border-[#EAE7DF] flex items-center justify-center transition-colors shrink-0">
-                        {renderIcon(project.iconName)}
+        {projects.length === 0 ? (
+          <div className="p-10 bg-white rounded-2xl border border-[#E8E8E5] text-center space-y-2">
+            <Sparkles className="w-8 h-8 text-[#D99B26] mx-auto opacity-60" />
+            <p className="text-sm font-semibold text-[#555555]">
+              {isEn ? "No projects published yet." : "Nenhum projeto cadastrado no momento."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map((project, idx) => {
+              return (
+                <div
+                  key={project.id}
+                  id={`project-showcase-${project.id}`}
+                  className="bg-white rounded-2xl border border-[#E8E8E5] hover:border-[#D99B26]/60 p-6 flex flex-col justify-between shadow-2xs hover:shadow-xs transition-all duration-200 group"
+                >
+                  <div className="space-y-4">
+                    {/* Header: Micro-Icon, Badge & Number */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF8F5] group-hover:bg-[#E5A93B]/20 text-[#1E3A47] group-hover:text-[#8F6413] border border-[#EAE7DF] flex items-center justify-center transition-colors shrink-0">
+                          {renderIcon(project.iconName)}
+                        </div>
+                        <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-[#1E3A47]/6 text-[#1E3A47] tracking-wider uppercase">
+                          {project.badge.replace(/Projeto Real • |Real Project • /, '')}
+                        </span>
                       </div>
-                      <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-[#1E3A47]/6 text-[#1E3A47] tracking-wider uppercase">
-                        {project.badge.replace(/Projeto Real • |Real Project • /, '')}
+
+                      <span className="text-xs font-mono font-bold text-[#888888] bg-[#F7F7F5] px-2.5 py-0.5 rounded-md">
+                        {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
                       </span>
                     </div>
 
-                    <span className="text-xs font-mono font-bold text-[#888888] bg-[#F7F7F5] px-2.5 py-0.5 rounded-md">
-                      0{idx + 1}
-                    </span>
-                  </div>
 
                   {/* Title & Tagline */}
                   <div>
@@ -134,7 +173,9 @@ export default function UseCases({ onSelectSolutionForContact: _onSelectSolution
             );
           })}
         </div>
-      </div>
-    </section>
-  );
+      )}
+    </div>
+  </section>
+);
 }
+

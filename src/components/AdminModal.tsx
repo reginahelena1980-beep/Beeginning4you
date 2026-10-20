@@ -35,7 +35,21 @@ import {
   ShieldAlert,
   CloudUpload,
   RefreshCw,
-  LogOut
+  LogOut,
+  ArrowUp,
+  ArrowDown,
+  Edit3,
+  ShoppingBag,
+  Cpu,
+  Workflow,
+  Wallet,
+  Calculator,
+  Globe,
+  Layers,
+  BarChart3,
+  Zap,
+  Smartphone,
+  ShieldCheck
 } from 'lucide-react';
 import reginaDefaultPhoto from '../assets/images/regina_portrait_1790082408093.jpg';
 import {
@@ -44,7 +58,8 @@ import {
   ContactConfig,
   MeetingDiagnosticData,
   AdminAvailabilityConfig,
-  BlockedSlot
+  BlockedSlot,
+  RealProjectExample
 } from '../types';
 import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -68,7 +83,13 @@ import {
   DEFAULT_AVAILABILITY_CONFIG,
   STORAGE_CHANGE_EVENT,
   loadAdminCrmData,
-  clearAdminCrmData
+  clearAdminCrmData,
+  getStoredRealProjects,
+  saveRealProjects,
+  addRealProject,
+  updateRealProject,
+  deleteRealProject,
+  resetRealProjectsToDefault
 } from '../utils/adminStorage';
 import { generateGoogleCalendarUrl } from '../utils/calendar';
 interface AdminModalProps {
@@ -86,7 +107,8 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
   const [loginError, setLoginError] = useState<string>('');
 
-  const [activeTab, setActiveTab] = useState<'agenda' | 'demandas' | 'disponibilidade' | 'config'>('agenda');
+  const [activeTab, setActiveTab] = useState<'agenda' | 'demandas' | 'projetos' | 'disponibilidade' | 'config'>('agenda');
+
 
   // Admin Data state
   const [config, setConfig] = useState<ContactConfig>(getContactConfig());
@@ -151,6 +173,31 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   const [previewImageError, setPreviewImageError] = useState<boolean>(false);
   const [urlInputValue, setUrlInputValue] = useState<string>('');
 
+  // Real Projects Management state
+  const [projectsList, setProjectsList] = useState<RealProjectExample[]>(() => getStoredRealProjects('pt'));
+  const [projectsNotice, setProjectsNotice] = useState<string>('');
+  const [isEditingProject, setIsEditingProject] = useState<boolean>(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [projectForm, setProjectForm] = useState<{
+    title: string;
+    badge: string;
+    iconName: string;
+    tagline: string;
+    challenge: string;
+    solution: string;
+    resultsNote: string;
+    highlightsText: string;
+  }>({
+    title: '',
+    badge: 'Projeto Real • Sob Medida',
+    iconName: 'Workflow',
+    tagline: '',
+    challenge: '',
+    solution: '',
+    resultsNote: '',
+    highlightsText: ''
+  });
+
   // Load data when opening or when storage changes
   const loadData = () => {
     const curConfig = getContactConfig();
@@ -160,6 +207,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     setAppointments(curAppointments);
     setDemands(getAllDemandForms());
     setAvailability(getAvailabilityConfig());
+    setProjectsList(getStoredRealProjects('pt'));
 
     // Auto-select first appointment if none is selected
     setSelectedMeeting((prev) => {
@@ -175,6 +223,7 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
   };
 
   useEffect(() => {
+
     if (isOpen) {
       loadData();
     }
@@ -707,7 +756,168 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
     setTimeout(() => setAvailNotice(''), 4000);
   };
 
+  // ========================
+  // Real Projects Handlers (Projetos na Prática)
+  // ========================
+  const PROJECT_ICONS = [
+    { name: 'Workflow', label: 'Processos / Fluxos' },
+    { name: 'Wallet', label: 'Finanças / Caixa' },
+    { name: 'Calculator', label: 'Precificação / Margem' },
+    { name: 'Globe', label: 'Plataforma Web / Site' },
+    { name: 'ShoppingBag', label: 'E-commerce / Loja' },
+    { name: 'Cpu', label: 'Sistemas / Automação' },
+    { name: 'BarChart3', label: 'Painéis / Indicadores' },
+    { name: 'Zap', label: 'Agilidade / Rotinas' },
+    { name: 'Smartphone', label: 'Aplicativo / Mobile' },
+    { name: 'Sparkles', label: 'Inovação / Destaque' },
+    { name: 'ShieldCheck', label: 'Segurança / LGPD' },
+    { name: 'CheckCircle2', label: 'Resultados / Entrega' }
+  ];
+
+  const renderProjectIcon = (iconName: string, className = 'w-4 h-4') => {
+    const props = { className };
+    switch (iconName) {
+      case 'ShoppingBag': return <ShoppingBag {...props} />;
+      case 'Cpu': return <Cpu {...props} />;
+      case 'Wallet': return <Wallet {...props} />;
+      case 'Calculator': return <Calculator {...props} />;
+      case 'Globe': return <Globe {...props} />;
+      case 'Sparkles': return <Sparkles {...props} />;
+      case 'Layers': return <Layers {...props} />;
+      case 'ShieldCheck': return <ShieldCheck {...props} />;
+      case 'BarChart3': return <BarChart3 {...props} />;
+      case 'Zap': return <Zap {...props} />;
+      case 'Smartphone': return <Smartphone {...props} />;
+      case 'CheckCircle2': return <CheckCircle2 {...props} />;
+      default: return <Workflow {...props} />;
+    }
+  };
+
+  const handleOpenNewProject = () => {
+    setProjectForm({
+      title: '',
+      badge: 'Projeto Real • Sob Medida',
+      iconName: 'Workflow',
+      tagline: '',
+      challenge: '',
+      solution: '',
+      resultsNote: '',
+      highlightsText: ''
+    });
+    setEditingProjectId(null);
+    setIsEditingProject(true);
+  };
+
+  const handleOpenEditProject = (project: RealProjectExample) => {
+    setProjectForm({
+      title: project.title,
+      badge: project.badge,
+      iconName: project.iconName || 'Workflow',
+      tagline: project.tagline || '',
+      challenge: project.challenge || '',
+      solution: project.solution || '',
+      resultsNote: project.resultsNote || '',
+      highlightsText: Array.isArray(project.highlights) ? project.highlights.join('\n') : ''
+    });
+    setEditingProjectId(project.id);
+    setIsEditingProject(true);
+  };
+
+  const handleSaveProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectForm.title.trim()) {
+      alert('Por favor, informe o título do projeto.');
+      return;
+    }
+    if (!projectForm.challenge.trim()) {
+      alert('Por favor, descreva o desafio do projeto.');
+      return;
+    }
+    if (!projectForm.solution.trim()) {
+      alert('Por favor, descreva a solução sob medida do projeto.');
+      return;
+    }
+
+    const highlights = projectForm.highlightsText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    let updatedList: RealProjectExample[];
+    if (editingProjectId) {
+      updatedList = updateRealProject(
+        editingProjectId,
+        {
+          title: projectForm.title.trim(),
+          badge: projectForm.badge.trim() || 'Projeto Real • Sob Medida',
+          iconName: projectForm.iconName,
+          tagline: projectForm.tagline.trim(),
+          challenge: projectForm.challenge.trim(),
+          solution: projectForm.solution.trim(),
+          resultsNote: projectForm.resultsNote.trim(),
+          highlights
+        },
+        adminIdToken
+      );
+      setProjectsNotice('Projeto atualizado com sucesso no site!');
+    } else {
+      updatedList = addRealProject(
+        {
+          title: projectForm.title.trim(),
+          badge: projectForm.badge.trim() || 'Projeto Real • Sob Medida',
+          iconName: projectForm.iconName,
+          tagline: projectForm.tagline.trim(),
+          challenge: projectForm.challenge.trim(),
+          solution: projectForm.solution.trim(),
+          resultsNote: projectForm.resultsNote.trim(),
+          highlights
+        },
+        adminIdToken
+      );
+      setProjectsNotice('Novo projeto incluído com sucesso no site!');
+    }
+
+    setProjectsList(updatedList);
+    setIsEditingProject(false);
+    setEditingProjectId(null);
+    setTimeout(() => setProjectsNotice(''), 4500);
+  };
+
+  const handleDeleteProject = (project: RealProjectExample) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o projeto "${project.title}" da exibição no site?`)) {
+      return;
+    }
+    const updated = deleteRealProject(project.id, adminIdToken);
+    setProjectsList(updated);
+    setProjectsNotice(`Projeto "${project.title}" excluído com sucesso.`);
+    setTimeout(() => setProjectsNotice(''), 4500);
+  };
+
+  const handleMoveProject = (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= projectsList.length) return;
+    const reordered = [...projectsList];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(targetIndex, 0, moved);
+    const updated = saveRealProjects(reordered, adminIdToken);
+    setProjectsList(updated);
+    setProjectsNotice('Ordem dos projetos atualizada com sucesso!');
+    setTimeout(() => setProjectsNotice(''), 3000);
+  };
+
+  const handleRestoreDefaultProjects = () => {
+    if (!window.confirm('Deseja restaurar a lista com os 5 projetos originais da Beeginning 4 you?')) {
+      return;
+    }
+    const updated = resetRealProjectsToDefault(adminIdToken);
+    setProjectsList(updated);
+    setIsEditingProject(false);
+    setProjectsNotice('Os 5 projetos originais foram restaurados com sucesso no site!');
+    setTimeout(() => setProjectsNotice(''), 4500);
+  };
+
   const filteredDemands = demands.filter((item) => {
+
     const s = (item.status || '').toLowerCase();
     const orig = (item.origin || item.source || '').toLowerCase();
 
@@ -920,7 +1130,26 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
 
               <button
                 type="button"
+                id="btn-admin-tab-projetos"
+                onClick={() => {
+                  setActiveTab('projetos');
+                  setSelectedMeeting(null);
+                  setSelectedDemand(null);
+                }}
+                className={`py-3 text-xs font-bold border-b-2 flex items-center gap-2 cursor-pointer transition-colors ${
+                  activeTab === 'projetos'
+                    ? 'border-[#1E3A47] text-[#1E3A47]'
+                    : 'border-transparent text-[#666666] hover:text-[#1A1A1A]'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-[#D99B26]" />
+                <span>Projetos na Prática ({projectsList.length})</span>
+              </button>
+
+              <button
+                type="button"
                 id="btn-admin-tab-disponibilidade"
+
                 onClick={() => {
                   setActiveTab('disponibilidade');
                   setSelectedMeeting(null);
@@ -1686,8 +1915,518 @@ export default function AdminModal({ isOpen, onClose }: AdminModalProps) {
                 </div>
               )}
 
+              {/* TAB: PROJETOS NA PRÁTICA (COMPLETAMENTE EDITÁVEL PELO ADM) */}
+              {activeTab === 'projetos' && (
+                <div className="space-y-6">
+                  {/* Feedback Banner */}
+                  {projectsNotice && (
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 font-medium animate-fadeIn">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>{projectsNotice}</span>
+                    </div>
+                  )}
+
+                  {/* Header Intro & Actions Bar */}
+                  <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#E5E5E2] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-[#1E3A47]">
+                        <Sparkles className="w-5 h-5 text-[#D99B26]" />
+                        <h4 className="text-base font-bold text-[#1A1A1A]">
+                          Gestão de Projetos Reais na Prática
+                        </h4>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#1E3A47]/8 text-[#1E3A47]">
+                          {projectsList.length} {projectsList.length === 1 ? 'projeto ativo' : 'projetos ativos'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#666666] max-w-2xl leading-relaxed">
+                        Gerencie com total liberdade os projetos exibidos na seção <strong>&ldquo;Negócios Reais, Resultados Concretos&rdquo;</strong> do site.
+                        Você pode <strong>incluir novos projetos</strong>, <strong>editar textos e ícones</strong>, <strong>reorganizar a ordem (01, 02, 03...)</strong> ou <strong>excluir</strong> projetos a qualquer momento.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleRestoreDefaultProjects}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#D5D5D0] bg-white hover:bg-[#F5F5F3] text-xs font-semibold text-[#555555] transition-colors cursor-pointer"
+                        title="Restaurar a lista original de 5 projetos da Beeginning"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Restaurar Padrão</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        id="btn-admin-add-project"
+                        onClick={handleOpenNewProject}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-[#1A1A1A] text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Incluir Novo Projeto</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Inline Project Editor Modal / Panel */}
+                  {isEditingProject && (
+                    <div className="bg-white rounded-2xl border-2 border-[#1E3A47]/30 shadow-md p-5 sm:p-6 space-y-5 animate-fadeIn">
+                      <div className="flex items-center justify-between pb-3 border-b border-[#EAEAE7]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-[#1E3A47] text-white flex items-center justify-center">
+                            {editingProjectId ? <Edit3 className="w-3.5 h-3.5" /> : <Plus className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <h5 className="text-sm font-bold text-[#1A1A1A]">
+                              {editingProjectId ? 'Editar Projeto na Prática' : 'Incluir Novo Projeto na Prática'}
+                            </h5>
+                            <p className="text-[11px] text-[#777777]">
+                              Preencha os campos abaixo. Veja a pré-visualização em tempo real à direita.
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingProject(false);
+                            setEditingProjectId(null);
+                          }}
+                          className="p-1.5 text-[#888888] hover:text-[#1A1A1A] hover:bg-[#F0F0EE] rounded-lg transition-colors cursor-pointer"
+                          aria-label="Fechar editor de projeto"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <form onSubmit={handleSaveProject} className="space-y-4">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                          {/* Left Column: Form Fields */}
+                          <div className="lg:col-span-7 space-y-3.5 text-xs">
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                                Título Principal do Projeto *
+                              </label>
+                              <input
+                                required
+                                type="text"
+                                value={projectForm.title}
+                                onChange={(e) => setProjectForm({ ...projectForm, title: e.target.value })}
+                                placeholder="Ex: Gestão Financeira Descomplicada & Fluxo de Caixa"
+                                className="w-full px-3.5 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] focus:ring-1 focus:ring-[#1E3A47]/20 outline-none text-xs"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                                  Categoria / Badge *
+                                </label>
+                                <input
+                                  required
+                                  type="text"
+                                  value={projectForm.badge}
+                                  onChange={(e) => setProjectForm({ ...projectForm, badge: e.target.value })}
+                                  placeholder="Ex: Finanças Enxutas, Precificação Segura..."
+                                  className="w-full px-3.5 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] focus:ring-1 focus:ring-[#1E3A47]/20 outline-none text-xs"
+                                />
+                                <span className="text-[10px] text-[#888888] mt-0.5 block">
+                                  Aparece como etiqueta em caixa alta no card
+                                </span>
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                                  Ícone Representativo
+                                </label>
+                                <select
+                                  value={projectForm.iconName}
+                                  onChange={(e) => setProjectForm({ ...projectForm, iconName: e.target.value })}
+                                  className="w-full px-3 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs bg-white font-medium cursor-pointer"
+                                >
+                                  {PROJECT_ICONS.map((icon) => (
+                                    <option key={icon.name} value={icon.name}>
+                                      {icon.label} ({icon.name})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Icon visual selector buttons */}
+                            <div>
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-[#666666] mb-1.5">
+                                Seleção Rápida de Ícone:
+                              </span>
+                              <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                                {PROJECT_ICONS.map((icon) => {
+                                  const isSelected = projectForm.iconName === icon.name;
+                                  return (
+                                    <button
+                                      key={icon.name}
+                                      type="button"
+                                      onClick={() => setProjectForm({ ...projectForm, iconName: icon.name })}
+                                      className={`p-2 rounded-lg border text-center flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                                        isSelected
+                                          ? 'border-[#1E3A47] bg-[#1E3A47]/10 text-[#1E3A47] font-bold ring-1 ring-[#1E3A47]'
+                                          : 'border-[#EAEAE7] hover:border-[#1E3A47]/40 bg-[#FAFAFA] text-[#666666]'
+                                      }`}
+                                      title={icon.label}
+                                    >
+                                      {renderProjectIcon(icon.name, 'w-3.5 h-3.5')}
+                                      <span className="text-[9px] truncate max-w-full leading-none">
+                                        {icon.name}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                                Subtítulo / Tagline Resumo
+                              </label>
+                              <input
+                                type="text"
+                                value={projectForm.tagline}
+                                onChange={(e) => setProjectForm({ ...projectForm, tagline: e.target.value })}
+                                placeholder="Ex: Controle de entradas, saídas, previsão de lucro e alertas sem planilhas confusas"
+                                className="w-full px-3.5 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#8F6413] mb-1 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-[#D99B26]" />
+                                <span>O Desafio do Cliente (A dor enfrentada) *</span>
+                              </label>
+                              <textarea
+                                required
+                                rows={3}
+                                value={projectForm.challenge}
+                                onChange={(e) => setProjectForm({ ...projectForm, challenge: e.target.value })}
+                                placeholder="Descreva a situação inicial do cliente, tempo perdido, planilhas quebradas ou falta de clareza..."
+                                className="w-full px-3.5 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs leading-relaxed"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#1E3A47] mb-1 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-[#1E3A47]" />
+                                <span>A Solução Sob Medida (O que foi construído) *</span>
+                              </label>
+                              <textarea
+                                required
+                                rows={3}
+                                value={projectForm.solution}
+                                onChange={(e) => setProjectForm({ ...projectForm, solution: e.target.value })}
+                                placeholder="Descreva a solução criada pela Beeginning, facilidade de uso, automações e benefícios..."
+                                className="w-full px-3.5 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs leading-relaxed"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                                Nota de Resultados / Frase de Impacto
+                              </label>
+                              <input
+                                type="text"
+                                value={projectForm.resultsNote}
+                                onChange={(e) => setProjectForm({ ...projectForm, resultsNote: e.target.value })}
+                                placeholder="Ex: Total clareza sobre o destino de cada centavo e paz mental no fechamento do mês."
+                                className="w-full px-3.5 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs italic"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#444444] mb-1">
+                                Destaques / Funcionalidades (Opcional &bull; um por linha)
+                              </label>
+                              <textarea
+                                rows={2}
+                                value={projectForm.highlightsText}
+                                onChange={(e) => setProjectForm({ ...projectForm, highlightsText: e.target.value })}
+                                placeholder="Exemplo:&#10;Registro ultrarrápido pelo celular&#10;Painel visual com margem líquida"
+                                className="w-full px-3.5 py-2 rounded-xl border border-[#D5D5D0] focus:border-[#1E3A47] outline-none text-xs font-mono text-[11px]"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Right Column: Live Card Preview */}
+                          <div className="lg:col-span-5 space-y-2">
+                            <div className="flex items-center justify-between pb-1">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-[#666666]">
+                                Pré-visualização ao Vivo no Site:
+                              </span>
+                              <span className="text-[10px] text-[#888888] font-mono">
+                                Card Exato
+                              </span>
+                            </div>
+
+                            {/* Render exact card matching UseCases.tsx */}
+                            <div className="bg-white rounded-2xl border-2 border-[#D99B26]/40 p-5 shadow-sm space-y-4 text-left">
+                              {/* Header: Micro-Icon, Badge & Number */}
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-9 h-9 rounded-xl bg-[#FAF8F5] text-[#1E3A47] border border-[#EAE7DF] flex items-center justify-center shrink-0">
+                                    {renderProjectIcon(projectForm.iconName, 'w-4 h-4')}
+                                  </div>
+                                  <span className="text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-[#1E3A47]/6 text-[#1E3A47] tracking-wider uppercase">
+                                    {projectForm.badge.replace(/Projeto Real • |Real Project • /, '') || 'CATEGORIA'}
+                                  </span>
+                                </div>
+
+                                <span className="text-xs font-mono font-bold text-[#888888] bg-[#F7F7F5] px-2.5 py-0.5 rounded-md">
+                                  {editingProjectId
+                                    ? `0${(projectsList.findIndex((p) => p.id === editingProjectId) + 1) || 1}`
+                                    : `0${projectsList.length + 1}`}
+                                </span>
+                              </div>
+
+                              {/* Title & Tagline */}
+                              <div>
+                                <h5 className="text-base font-bold font-display text-[#1A1A1A] leading-snug">
+                                  {projectForm.title || 'Título do Projeto'}
+                                </h5>
+                                <p className="text-xs text-[#666666] mt-1 font-normal leading-relaxed">
+                                  {projectForm.tagline || 'Subtítulo descritivo do projeto e escopo de atuação.'}
+                                </p>
+                              </div>
+
+                              {/* Unified Challenge & Solution Micro-Panel */}
+                              <div className="p-3.5 rounded-xl bg-[#FAFAFA] border border-[#EEEEEC] space-y-2.5 text-xs">
+                                <div>
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#8F6413] flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#D99B26]" />
+                                    Desafio
+                                  </span>
+                                  <p className="text-xs text-[#555555] mt-1 leading-relaxed">
+                                    {projectForm.challenge || 'Descrição da dificuldade enfrentada pelo cliente antes de iniciar.'}
+                                  </p>
+                                </div>
+
+                                <div className="pt-2.5 border-t border-[#EAEAEA]">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#1E3A47] flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1E3A47]" />
+                                    Solução Sob Medida
+                                  </span>
+                                  <p className="text-xs text-[#222222] font-medium mt-1 leading-relaxed">
+                                    {projectForm.solution || 'Descrição da aplicação e processo desenvolvido sob medida.'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Footer: Results Note */}
+                              <div className="pt-2.5 border-t border-[#F0F0EE]">
+                                <p className="text-xs text-[#666666] italic leading-relaxed">
+                                  {projectForm.resultsNote || 'Frase de resultado, impacto e ganho de eficiência.'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Form Buttons */}
+                        <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EAEAE7]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEditingProject(false);
+                              setEditingProjectId(null);
+                            }}
+                            className="px-4 py-2 rounded-xl text-xs font-semibold text-[#666666] hover:bg-[#F2F2EF] transition-colors cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            id="btn-save-project-form"
+                            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-[#1A1A1A] bg-[#E5A93B] hover:bg-[#D99B26] transition-colors shadow-xs cursor-pointer"
+                          >
+                            <Save className="w-4 h-4" />
+                            <span>{editingProjectId ? 'Atualizar Projeto no Site' : 'Salvar e Publicar Projeto'}</span>
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+
+                  {/* Projects List Grid */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-1">
+                      <div className="flex items-center gap-2">
+                        <h5 className="text-xs font-bold uppercase tracking-wider text-[#555555]">
+                          Projetos Exibidos no Site
+                        </h5>
+                        <span className="text-xs font-semibold text-[#888888]">
+                          ({projectsList.length})
+                        </span>
+                      </div>
+
+                      <span className="text-[11px] text-[#777777]">
+                        Use as setas para alterar a posição (01, 02, 03...)
+                      </span>
+                    </div>
+
+                    {projectsList.length === 0 ? (
+                      <div className="p-12 text-center bg-white rounded-2xl border border-[#EAEAE7] text-xs text-[#777777] space-y-3">
+                        <Sparkles className="w-10 h-10 text-[#CCCCCC] mx-auto" />
+                        <div className="space-y-1">
+                          <p className="font-bold text-[#333333] text-sm">Nenhum projeto cadastrado</p>
+                          <p className="text-xs text-[#888888]">
+                            A seção de projetos no site está vazia. Você pode incluir um novo projeto ou restaurar os projetos padrão da Beeginning.
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-center gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={handleRestoreDefaultProjects}
+                            className="px-3 py-1.5 rounded-xl border border-[#D5D5D0] text-xs font-semibold text-[#555555] hover:bg-[#F5F5F3]"
+                          >
+                            Restaurar 5 Projetos Padrão
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleOpenNewProject}
+                            className="px-4 py-1.5 rounded-xl bg-[#E5A93B] hover:bg-[#D99B26] text-[#1A1A1A] text-xs font-bold"
+                          >
+                            + Incluir Primeiro Projeto
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {projectsList.map((project, idx) => {
+                          const isFirst = idx === 0;
+                          const isLast = idx === projectsList.length - 1;
+                          const displayIndex = idx + 1 < 10 ? `0${idx + 1}` : `${idx + 1}`;
+
+                          return (
+                            <div
+                              key={project.id}
+                              className="bg-white rounded-2xl border border-[#E5E5E2] hover:border-[#1E3A47]/40 p-5 shadow-xs flex flex-col justify-between space-y-4 transition-all"
+                            >
+                              <div className="space-y-3">
+                                {/* Top Bar: Order, Icon, Badge & Number */}
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg bg-[#FAF8F5] text-[#1E3A47] border border-[#EAE7DF] flex items-center justify-center shrink-0">
+                                      {renderProjectIcon(project.iconName, 'w-4 h-4')}
+                                    </div>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#1E3A47]/8 text-[#1E3A47] tracking-wider uppercase">
+                                      {project.badge.replace(/Projeto Real • |Real Project • /, '')}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-mono font-bold text-[#888888] bg-[#F7F7F5] px-2 py-0.5 rounded-md">
+                                      {displayIndex}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Title & Tagline */}
+                                <div>
+                                  <h6 className="text-sm sm:text-base font-bold text-[#1A1A1A] leading-snug">
+                                    {project.title}
+                                  </h6>
+                                  {project.tagline && (
+                                    <p className="text-xs text-[#666666] mt-0.5 leading-relaxed">
+                                      {project.tagline}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {/* Mini summary of Challenge & Solution */}
+                                <div className="p-3 rounded-xl bg-[#FAFAFA] border border-[#EEEEEC] space-y-2 text-[11px]">
+                                  <div>
+                                    <span className="font-bold text-[#8F6413] block">
+                                      Desafio:
+                                    </span>
+                                    <p className="text-[#555555] line-clamp-2 leading-relaxed">
+                                      {project.challenge}
+                                    </p>
+                                  </div>
+
+                                  <div className="pt-1.5 border-t border-[#EAEAEA]">
+                                    <span className="font-bold text-[#1E3A47] block">
+                                      Solução Sob Medida:
+                                    </span>
+                                    <p className="text-[#333333] line-clamp-2 leading-relaxed">
+                                      {project.solution}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {project.resultsNote && (
+                                  <p className="text-[11px] text-[#666666] italic line-clamp-1">
+                                    &ldquo;{project.resultsNote}&rdquo;
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Card Action Controls */}
+                              <div className="pt-3 border-t border-[#F0F0EE] flex items-center justify-between gap-2">
+                                {/* Reordering buttons */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={isFirst}
+                                    onClick={() => handleMoveProject(idx, 'up')}
+                                    className="p-1.5 rounded-lg border border-[#EAEAE7] hover:bg-[#F5F5F3] disabled:opacity-30 disabled:cursor-not-allowed text-[#555555] cursor-pointer"
+                                    title="Subir posição"
+                                  >
+                                    <ArrowUp className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isLast}
+                                    onClick={() => handleMoveProject(idx, 'down')}
+                                    className="p-1.5 rounded-lg border border-[#EAEAE7] hover:bg-[#F5F5F3] disabled:opacity-30 disabled:cursor-not-allowed text-[#555555] cursor-pointer"
+                                    title="Descer posição"
+                                  >
+                                    <ArrowDown className="w-3.5 h-3.5" />
+                                  </button>
+                                  <span className="text-[10px] text-[#888888] ml-1">
+                                    Posição {displayIndex}
+                                  </span>
+                                </div>
+
+                                {/* Edit & Delete buttons */}
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditProject(project)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#D5D5D0] hover:bg-[#F0F0EE] text-xs font-semibold text-[#333333] transition-colors cursor-pointer"
+                                    title="Editar este projeto"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                    <span>Editar</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteProject(project)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-red-200 hover:bg-red-50 text-xs font-semibold text-red-600 transition-colors cursor-pointer"
+                                    title="Excluir este projeto"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Excluir</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* TAB 3: DISPONIBILIDADE & HORÁRIOS */}
               {activeTab === 'disponibilidade' && (
+
                 <div className="space-y-6">
                   {/* Feedback Banner */}
                   {availNotice && (

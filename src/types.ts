@@ -167,4 +167,5 @@ export interface ContactConfig {
   whatsappGatewayUrl?: string; // Server credential (handled securely server-side)
   whatsappGatewayToken?: string; // Server credential (handled securely server-side)
   availability?: AdminAvailabilityConfig; // Gestão de disponibilidade e bloqueios de horários
+  customProjects?: RealProjectExample[]; // Projetos reais na prática editáveis pelo ADM
 }

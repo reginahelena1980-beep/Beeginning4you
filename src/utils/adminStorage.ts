@@ -4,8 +4,11 @@ import {
   MeetingAppointment,
   MeetingDiagnosticData,
   AdminAvailabilityConfig,
-  BlockedSlot
+  BlockedSlot,
+  RealProjectExample
 } from '../types';
+import { getRealProjectExamples } from '../data/content';
+
 import {
   saveContactConfigToFirestore,
   subscribeContactConfigFromFirestore,
@@ -42,7 +45,9 @@ export const DEFAULT_CONTACT_CONFIG: ContactConfig = {
 const CONFIG_STORAGE_KEY = 'beeginning_contact_config_v1';
 const FORMS_STORAGE_KEY = 'beeginning_demand_forms_v1';
 const MEETINGS_STORAGE_KEY = 'beeginning_scheduled_meetings_v1';
+export const PROJECTS_STORAGE_KEY = 'beeginning_real_projects_v1';
 export const STORAGE_CHANGE_EVENT = 'beeginning_storage_updated';
+
 
 // In-memory CRM data storage (restricted to authenticated admin sessions only)
 let inMemoryDemands: DemandForm[] = [];
@@ -120,6 +125,9 @@ if (typeof window !== 'undefined') {
       if (data?.config && Object.keys(data.config).length > 0) {
         const sanitized = sanitizeContactConfig(data.config);
         localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+        if (Array.isArray(sanitized.customProjects)) {
+          localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(sanitized.customProjects));
+        }
         notifyStorageChange();
       }
     })
@@ -130,6 +138,9 @@ if (typeof window !== 'undefined') {
     if (remoteConfig && Object.keys(remoteConfig).length > 0) {
       const sanitized = sanitizeContactConfig(remoteConfig);
       localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+      if (Array.isArray(sanitized.customProjects)) {
+        localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(sanitized.customProjects));
+      }
       notifyStorageChange();
     }
   }).catch(() => {});
@@ -139,9 +150,13 @@ if (typeof window !== 'undefined') {
     if (remoteConfig && Object.keys(remoteConfig).length > 0) {
       const sanitized = sanitizeContactConfig(remoteConfig);
       localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(sanitized));
+      if (Array.isArray(sanitized.customProjects)) {
+        localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(sanitized.customProjects));
+      }
       notifyStorageChange();
     }
   });
+
 
   // 4. Fetch anonymized booked slots for availability checking (NO CLIENT DATA)
   refreshBookedSlots();
@@ -307,8 +322,13 @@ export function sanitizeContactConfig(config: Partial<ContactConfig> | null | un
   };
   merged.availability = sanitizedAvailability;
 
+  if (Array.isArray(config?.customProjects)) {
+    merged.customProjects = config.customProjects;
+  }
+
   return merged;
 }
+
 
 // ========================
 // 1. Contact Configuration & Availability
@@ -336,8 +356,10 @@ export function saveContactConfig(config: ContactConfig, idToken?: string): Cont
       ...config,
       whatsappNumber: cleanWa || DEFAULT_CONTACT_CONFIG.whatsappNumber,
       whatsappDisplay: formatWhatsAppDisplay(cleanWa || DEFAULT_CONTACT_CONFIG.whatsappNumber),
-      availability: config.availability || DEFAULT_AVAILABILITY_CONFIG
+      availability: config.availability || DEFAULT_AVAILABILITY_CONFIG,
+      customProjects: config.customProjects
     };
+
     localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(updated));
     saveContactConfigToFirestore(updated);
     try {
@@ -688,3 +710,93 @@ export function deleteAppointmentInStorage(id: string, idToken?: string): Meetin
   notifyStorageChange();
   return inMemoryAppointments;
 }
+
+// ========================
+// 4. Real Projects Management (Projetos na Prática)
+// ========================
+export function getStoredRealProjects(lang: string = 'pt'): RealProjectExample[] {
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(PROJECTS_STORAGE_KEY);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      }
+    } catch {}
+  }
+  const config = getContactConfig();
+  if (Array.isArray(config.customProjects)) {
+    return config.customProjects;
+  }
+  return getRealProjectExamples(lang);
+}
+
+export function saveRealProjects(projects: RealProjectExample[], idToken?: string): RealProjectExample[] {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+    } catch {}
+  }
+  const curConfig = getContactConfig();
+  const updatedConfig: ContactConfig = {
+    ...curConfig,
+    customProjects: projects
+  };
+  saveContactConfig(updatedConfig, idToken);
+  notifyStorageChange();
+  return projects;
+}
+
+export function addRealProject(
+  projectData: Omit<RealProjectExample, 'id'> & { id?: string },
+  idToken?: string
+): RealProjectExample[] {
+  const currentProjects = getStoredRealProjects('pt');
+  const newId = projectData.id || `proj-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+  const newProject: RealProjectExample = {
+    id: newId,
+    title: projectData.title.trim(),
+    badge: projectData.badge.trim() || 'Projeto Real • Sob Medida',
+    iconName: projectData.iconName || 'Workflow',
+    tagline: projectData.tagline?.trim() || '',
+    challenge: projectData.challenge.trim(),
+    solution: projectData.solution.trim(),
+    highlights: Array.isArray(projectData.highlights) ? projectData.highlights : [],
+    resultsNote: projectData.resultsNote?.trim() || ''
+  };
+  const updated = [...currentProjects, newProject];
+  return saveRealProjects(updated, idToken);
+}
+
+export function updateRealProject(
+  id: string,
+  updates: Partial<RealProjectExample>,
+  idToken?: string
+): RealProjectExample[] {
+  const currentProjects = getStoredRealProjects('pt');
+  const updated = currentProjects.map((p) => {
+    if (p.id === id) {
+      return {
+        ...p,
+        ...updates,
+        highlights: Array.isArray(updates.highlights) ? updates.highlights : p.highlights
+      };
+    }
+    return p;
+  });
+  return saveRealProjects(updated, idToken);
+}
+
+export function deleteRealProject(id: string, idToken?: string): RealProjectExample[] {
+  const currentProjects = getStoredRealProjects('pt');
+  const updated = currentProjects.filter((p) => p.id !== id);
+  return saveRealProjects(updated, idToken);
+}
+
+export function resetRealProjectsToDefault(idToken?: string): RealProjectExample[] {
+  const defaultProjects = getRealProjectExamples('pt');
+  return saveRealProjects(defaultProjects, idToken);
+}
+
