@@ -17,8 +17,21 @@
  * 12. Preservação do login administrativo (rotas protegidas rejeitam tokens falsos e aceitam credencial administrativa)
  */
 
-const BASE_URL = 'http://127.0.0.1:3000';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://127.0.0.1:3000';
 const TEST_ADMIN_SECRET = 'beeginning-dev-admin-secret-token';
+
+// GUARDA DE SEGURANÇA 1: Impede execução contra URLs públicas ou ambientes de produção
+if (
+  BASE_URL.startsWith('https://') ||
+  BASE_URL.includes('.run.app') ||
+  BASE_URL.includes('.vercel.app') ||
+  BASE_URL.includes('.web.app') ||
+  BASE_URL.includes('firebaseapp.com') ||
+  (!BASE_URL.includes('127.0.0.1') && !BASE_URL.includes('localhost'))
+) {
+  console.error(`\n🛑 [BLOQUEIO DE SEGURANÇA]: Testes automatizados com criação/alteração de dados NÃO podem ser executados contra URLs públicas (${BASE_URL}). Abortando.`);
+  process.exit(1);
+}
 
 interface TestResult {
   num: number;
@@ -48,6 +61,7 @@ async function api(path: string, options: { method: string; headers?: Record<str
     headers: {
       'Content-Type': 'application/json',
       'X-Forwarded-For': ip,
+      'X-Test-Execution': 'true',
       ...(options.headers || {})
     },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined

@@ -14,8 +14,9 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Identificação do ambiente de execução (Vercel Serverless vs Node Standalone)
+// Identificação do ambiente de execução (Vercel Serverless vs Node Standalone vs Produção)
 export const IS_VERCEL = Boolean(process.env.VERCEL || process.env.NOW_REGION || process.env.AWS_LAMBDA_FUNCTION_NAME);
+export const IS_PROD = Boolean(process.env.NODE_ENV === 'production' || IS_VERCEL);
 
 // Configuração de diretórios e arquivos de persistência
 // No Vercel, o sistema de arquivos raiz é estritamente read-only, permitindo escrita apenas em /tmp.
@@ -504,6 +505,37 @@ interface ServerAppData {
 
 let inMemoryFallbackData: ServerAppData = {};
 
+/**
+ * Armazenamento em memória isolado para testes automatizados.
+ * Impede estritamente que dados fictícios sejam escritos no Firestore de produção
+ * e impede contaminação do admin_app_data.json com registros de teste.
+ */
+interface TestStore {
+  appointments: any[];
+  demands: any[];
+  scheduleSlots: Map<string, { appointmentId: string | null; status: string; date: string; time: string }>;
+}
+
+export const inMemoryTestStore: TestStore = {
+  appointments: [],
+  demands: [],
+  scheduleSlots: new Map()
+};
+
+export function isTestRequest(req: express.Request): boolean {
+  if (IS_PROD) return false; // Em ambiente de produção, NUNCA opera em modo de teste
+  const headerTest = req.headers['x-test-execution'] === 'true';
+  const clientIp = getClientIp(req);
+  const isTestIp = clientIp.startsWith('198.51.100.') || clientIp.startsWith('203.0.113.');
+  return headerTest || isTestIp || process.env.NODE_ENV === 'test';
+}
+
+export function resetTestStore(): void {
+  inMemoryTestStore.appointments = [];
+  inMemoryTestStore.demands = [];
+  inMemoryTestStore.scheduleSlots.clear();
+}
+
 export function getServerAppData(): ServerAppData {
   try {
     if (fs.existsSync(SERVER_DATA_FILE)) {
@@ -572,7 +604,17 @@ export function getSlotDocId(date: string, time: string): string {
   return `${date}_${time.replace(':', '-')}`;
 }
 
-export async function getAllAppointments(): Promise<any[]> {
+/**
+ * Recuperação de agendamentos:
+ * Em produção: Firestore é a ÚNICA fonte oficial (SSOT). Se estiver vazio, retorna [].
+ * NUNCA recorre a admin_app_data.json como fallback de produção e NUNCA restaura mocks locais.
+ * Se o Firestore estiver indisponível em produção, dispara erro controlado.
+ */
+export async function getAllAppointments(options?: { isTest?: boolean }): Promise<any[]> {
+  if (options?.isTest) {
+    return inMemoryTestStore.appointments || [];
+  }
+
   const isAvailable = await checkFirestoreAvailability();
   if (adminDb && isAvailable) {
     try {
@@ -582,16 +624,30 @@ export async function getAllAppointments(): Promise<any[]> {
         list.push({ id: doc.id, ...doc.data() });
       });
       list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      // Fonte oficial: retorna exatamente o que está no Firestore (inclusive [] se vazio)
       return list;
     } catch (err: any) {
-      console.warn('[Firestore Admin] Fallback para leitura de agendamentos:', err?.message);
+      console.warn('[Firestore Admin] Falha na leitura de agendamentos do Firestore:', err?.message);
+      if (IS_PROD) {
+        throw new Error(`FIRESTORE_UNAVAILABLE: ${err?.message}`);
+      }
     }
   }
+
+  if (IS_PROD) {
+    throw new Error('FIRESTORE_UNAVAILABLE: O banco de dados do Firestore está indisponível em produção.');
+  }
+
+  // Apenas em desenvolvimento local/offline sem Firestore ativo
   const data = getServerAppData();
   return data.appointments || [];
 }
 
-export async function getAppointmentById(id: string): Promise<any | null> {
+export async function getAppointmentById(id: string, options?: { isTest?: boolean }): Promise<any | null> {
+  if (options?.isTest) {
+    return inMemoryTestStore.appointments.find((a: any) => a && a.id === id) || null;
+  }
+
   const isAvailable = await checkFirestoreAvailability();
   if (adminDb && isAvailable) {
     try {
@@ -601,14 +657,22 @@ export async function getAppointmentById(id: string): Promise<any | null> {
       }
       return null;
     } catch (err: any) {
-      console.warn('[Firestore Admin] Fallback para busca de agendamento por ID:', err?.message);
+      console.warn('[Firestore Admin] Erro ao buscar agendamento por ID no Firestore:', err?.message);
+      if (IS_PROD) {
+        throw new Error(`FIRESTORE_UNAVAILABLE: ${err?.message}`);
+      }
     }
   }
+
+  if (IS_PROD) {
+    throw new Error('FIRESTORE_UNAVAILABLE: O banco de dados do Firestore está indisponível em produção.');
+  }
+
   const data = getServerAppData();
   return (data.appointments || []).find((a: any) => a && a.id === id) || null;
 }
 
-export async function getAdminBlockedSlots(): Promise<any[]> {
+export async function getAdminBlockedSlots(options?: { isTest?: boolean }): Promise<any[]> {
   const isAvailable = await checkFirestoreAvailability();
   if (adminDb && isAvailable) {
     try {
@@ -620,14 +684,35 @@ export async function getAdminBlockedSlots(): Promise<any[]> {
         }
       }
     } catch (err: any) {
-      console.warn('[Firestore Admin] Fallback para leitura de bloqueios:', err?.message);
+      console.warn('[Firestore Admin] Erro ao ler bloqueios da agenda no Firestore:', err?.message);
+      if (IS_PROD && !options?.isTest) {
+        throw new Error(`FIRESTORE_UNAVAILABLE: ${err?.message}`);
+      }
     }
   }
+
+  if (IS_PROD && !options?.isTest) {
+    return [];
+  }
+
   const current = getServerAppData();
   return current.config?.availability?.blockedSlots || [];
 }
 
-export async function isSlotTaken(date: string, time: string, excludeId?: string): Promise<boolean> {
+export async function isSlotTaken(date: string, time: string, excludeId?: string, isTest?: boolean): Promise<boolean> {
+  if (isTest) {
+    const slot = inMemoryTestStore.scheduleSlots.get(getSlotDocId(date, time));
+    if (slot && slot.status !== 'cancelled' && slot.status !== 'released') {
+      if (excludeId && slot.appointmentId === excludeId) {
+        return false;
+      }
+      return true;
+    }
+    return inMemoryTestStore.appointments.some(
+      (a) => a && a.id !== excludeId && a.status !== 'cancelled' && a.date === date && a.time === time
+    );
+  }
+
   const isAvailable = await checkFirestoreAvailability();
   if (adminDb && isAvailable) {
     try {
@@ -636,15 +721,23 @@ export async function isSlotTaken(date: string, time: string, excludeId?: string
         const data = slotDoc.data();
         if (data && data.status !== 'cancelled' && data.status !== 'released') {
           if (excludeId && data.appointmentId === excludeId) {
-            // Permitido para o próprio titular
+            return false;
           } else if (data.appointmentId) {
             return true;
           }
         }
       }
+      return false;
     } catch (err: any) {
-      console.warn('[Schedule Engine] Fallback de verificação de slot no Firestore:', err?.message);
+      console.warn('[Schedule Engine] Erro na checagem de slot no Firestore:', err?.message);
+      if (IS_PROD) {
+        throw new Error(`FIRESTORE_UNAVAILABLE: ${err?.message}`);
+      }
     }
+  }
+
+  if (IS_PROD) {
+    throw new Error('FIRESTORE_UNAVAILABLE: O banco de dados do Firestore está indisponível em produção.');
   }
 
   const appointments = await getAllAppointments();
@@ -653,8 +746,8 @@ export async function isSlotTaken(date: string, time: string, excludeId?: string
   );
 }
 
-export async function isSlotAdminBlocked(date: string, time: string): Promise<boolean> {
-  const blockedSlots = await getAdminBlockedSlots();
+export async function isSlotAdminBlocked(date: string, time: string, isTest?: boolean): Promise<boolean> {
+  const blockedSlots = await getAdminBlockedSlots({ isTest });
   return blockedSlots.some(
     (b: any) => b && b.date === date && (!b.time || b.time === 'ALL_DAY' || b.time.trim() === '' || b.time === time)
   );
@@ -715,7 +808,7 @@ export const schedulingMutex = new AsyncKeyedMutex();
  * 5. TRANSAÇÕES ATÔMICAS DISTRIBUÍDAS NO FIRESTORE (SSOT)
  * ==============================================================================
  */
-export async function atomicCreateAppointment(sanitizedAppointment: any): Promise<{
+export async function atomicCreateAppointment(sanitizedAppointment: any, isTest?: boolean): Promise<{
   success: boolean;
   conflict?: boolean;
   reason?: string;
@@ -726,7 +819,35 @@ export async function atomicCreateAppointment(sanitizedAppointment: any): Promis
   const release = await schedulingMutex.acquire(slotKey);
 
   try {
-    const slotOccupied = await isSlotTaken(date, time, id);
+    // Modo de teste isolado: nunca escreve em produção nem em admin_app_data.json
+    if (isTest) {
+      const slotDoc = inMemoryTestStore.scheduleSlots.get(getSlotDocId(date, time));
+      if (slotDoc && slotDoc.status !== 'cancelled' && slotDoc.status !== 'released' && slotDoc.appointmentId !== id) {
+        return {
+          success: false,
+          conflict: true,
+          reason: 'Este horário já se encontra reservado. Por favor, selecione outro horário.'
+        };
+      }
+      const existingAppt = inMemoryTestStore.appointments.find((a) => a && a.id === id);
+      if (existingAppt) {
+        return {
+          success: false,
+          conflict: true,
+          reason: 'Identificador já existente. Operações públicas não podem sobrescrever registros.'
+        };
+      }
+      inMemoryTestStore.scheduleSlots.set(getSlotDocId(date, time), {
+        appointmentId: id,
+        date,
+        time,
+        status: 'confirmed'
+      });
+      inMemoryTestStore.appointments.unshift(sanitizedAppointment);
+      return { success: true, persisted: true };
+    }
+
+    const slotOccupied = await isSlotTaken(date, time, id, false);
     if (slotOccupied) {
       return {
         success: false,
@@ -735,7 +856,7 @@ export async function atomicCreateAppointment(sanitizedAppointment: any): Promis
       };
     }
 
-    const slotBlocked = await isSlotAdminBlocked(date, time);
+    const slotBlocked = await isSlotAdminBlocked(date, time, false);
     if (slotBlocked) {
       return {
         success: false,
@@ -744,7 +865,7 @@ export async function atomicCreateAppointment(sanitizedAppointment: any): Promis
       };
     }
 
-    const existing = await getAppointmentById(id);
+    const existing = await getAppointmentById(id, { isTest: false });
     if (existing) {
       return {
         success: false,
@@ -834,36 +955,56 @@ export async function atomicCreateAppointment(sanitizedAppointment: any): Promis
           reason: `Não foi possível gravar o agendamento no Firestore: ${firestoreError || 'Erro desconhecido'}`
         };
       }
-    } else if (IS_VERCEL) {
-      // No Vercel, se o Firestore estiver sem conexão/credenciais válidas, falha de maneira segura (FAIL-SAFE)
+    } else if (IS_PROD) {
+      // Em produção, se o Firestore estiver indisponível, falha de maneira controlada (NUNCA grava em JSON local)
       return {
         success: false,
         reason: 'O serviço de banco de dados do Firestore está indisponível para registro do agendamento.'
       };
     }
 
-    // Espelhamento local para ambiente de desenvolvimento/testes
-    const current = getServerAppData();
-    const existingList = current.appointments || [];
-    const idx = existingList.findIndex((a: any) => a && a.id === id);
-    if (idx >= 0) {
-      existingList[idx] = { ...existingList[idx], ...sanitizedAppointment };
-    } else {
-      existingList.unshift(sanitizedAppointment);
+    if (!IS_PROD) {
+      // Espelhamento apenas em desenvolvimento local offline
+      const current = getServerAppData();
+      const existingList = current.appointments || [];
+      const idx = existingList.findIndex((a: any) => a && a.id === id);
+      if (idx >= 0) {
+        existingList[idx] = { ...existingList[idx], ...sanitizedAppointment };
+      } else {
+        existingList.unshift(sanitizedAppointment);
+      }
+      current.appointments = existingList;
+      saveServerAppData(current);
     }
-    current.appointments = existingList;
-    const localSaved = saveServerAppData(current);
 
     return {
-      success: firestoreSaved || localSaved,
-      persisted: firestoreSaved || localSaved
+      success: firestoreSaved || !IS_PROD,
+      persisted: firestoreSaved || !IS_PROD
     };
   } finally {
     release();
   }
 }
 
-export async function persistAppointment(appointment: any): Promise<boolean> {
+export async function persistAppointment(appointment: any, isTest?: boolean): Promise<boolean> {
+  if (isTest) {
+    const idx = inMemoryTestStore.appointments.findIndex((a) => a && a.id === appointment.id);
+    if (idx >= 0) {
+      inMemoryTestStore.appointments[idx] = { ...inMemoryTestStore.appointments[idx], ...appointment };
+    } else {
+      inMemoryTestStore.appointments.unshift(appointment);
+    }
+    if (appointment.date && appointment.time) {
+      inMemoryTestStore.scheduleSlots.set(getSlotDocId(appointment.date, appointment.time), {
+        appointmentId: appointment.id,
+        date: appointment.date,
+        time: appointment.time,
+        status: appointment.status || 'confirmed'
+      });
+    }
+    return true;
+  }
+
   let firestoreSaved = false;
   const isAvailable = await checkFirestoreAvailability();
   if (adminDb && isAvailable) {
@@ -890,6 +1031,10 @@ export async function persistAppointment(appointment: any): Promise<boolean> {
     }
   }
 
+  if (IS_PROD) {
+    return firestoreSaved;
+  }
+
   const current = getServerAppData();
   const existing = current.appointments || [];
   const idx = existing.findIndex((a: any) => a && a.id === appointment.id);
@@ -908,7 +1053,8 @@ export async function atomicRescheduleAppointment(
   appointmentId: string,
   newDate: string,
   newTime: string,
-  actorDesc: string
+  actorDesc: string,
+  isTest?: boolean
 ): Promise<{
   success: boolean;
   conflict?: boolean;
@@ -916,7 +1062,7 @@ export async function atomicRescheduleAppointment(
   persisted?: boolean;
   appointment?: any;
 }> {
-  const currentAppt = await getAppointmentById(appointmentId);
+  const currentAppt = await getAppointmentById(appointmentId, { isTest });
   if (!currentAppt) {
     return { success: false, reason: 'Agendamento não encontrado.' };
   }
@@ -929,7 +1075,53 @@ export async function atomicRescheduleAppointment(
   const release = await schedulingMutex.acquire([oldSlotKey, newSlotKey]);
 
   try {
-    const slotOccupied = await isSlotTaken(newDate, newTime, appointmentId);
+    if (isTest) {
+      const newSlot = inMemoryTestStore.scheduleSlots.get(getSlotDocId(newDate, newTime));
+      if (newSlot && newSlot.status !== 'cancelled' && newSlot.status !== 'released' && newSlot.appointmentId !== appointmentId) {
+        return {
+          success: false,
+          conflict: true,
+          reason: 'O horário selecionado já se encontra reservado. Por favor, selecione outro horário.'
+        };
+      }
+      const updatedAppointment = {
+        ...currentAppt,
+        date: newDate,
+        time: newTime,
+        status: 'rescheduled',
+        updatedAt: new Date().toISOString(),
+        history: [
+          ...(currentAppt.history || []),
+          {
+            date: new Date().toISOString(),
+            action: `Reagendada de ${oldDate} ${oldTime} para ${newDate} às ${newTime} por ${actorDesc}`
+          }
+        ]
+      };
+      inMemoryTestStore.scheduleSlots.set(getSlotDocId(oldDate, oldTime), {
+        appointmentId: null,
+        date: oldDate,
+        time: oldTime,
+        status: 'released'
+      });
+      inMemoryTestStore.scheduleSlots.set(getSlotDocId(newDate, newTime), {
+        appointmentId: appointmentId,
+        date: newDate,
+        time: newTime,
+        status: 'confirmed'
+      });
+      const idx = inMemoryTestStore.appointments.findIndex((a) => a && a.id === appointmentId);
+      if (idx >= 0) {
+        inMemoryTestStore.appointments[idx] = updatedAppointment;
+      }
+      return {
+        success: true,
+        persisted: true,
+        appointment: updatedAppointment
+      };
+    }
+
+    const slotOccupied = await isSlotTaken(newDate, newTime, appointmentId, false);
     if (slotOccupied) {
       return {
         success: false,
@@ -938,7 +1130,7 @@ export async function atomicRescheduleAppointment(
       };
     }
 
-    const slotBlocked = await isSlotAdminBlocked(newDate, newTime);
+    const slotBlocked = await isSlotAdminBlocked(newDate, newTime, false);
     if (slotBlocked) {
       return {
         success: false,
@@ -1012,6 +1204,21 @@ export async function atomicRescheduleAppointment(
       }
     }
 
+    if (IS_PROD) {
+      if (!firestoreSaved) {
+        return {
+          success: false,
+          persisted: false,
+          reason: 'O serviço de banco de dados do Firestore está indisponível em produção.'
+        };
+      }
+      return {
+        success: true,
+        persisted: true,
+        appointment: updatedAppointment
+      };
+    }
+
     const current = getServerAppData();
     const existingList = current.appointments || [];
     const idx = existingList.findIndex((a: any) => a && a.id === appointmentId);
@@ -1036,14 +1243,15 @@ export async function atomicRescheduleAppointment(
 
 export async function atomicCancelAppointment(
   appointmentId: string,
-  actorDesc: string
+  actorDesc: string,
+  isTest?: boolean
 ): Promise<{
   success: boolean;
   reason?: string;
   persisted?: boolean;
   appointment?: any;
 }> {
-  const currentAppt = await getAppointmentById(appointmentId);
+  const currentAppt = await getAppointmentById(appointmentId, { isTest });
   if (!currentAppt) {
     return { success: false, reason: 'Agendamento não encontrado.' };
   }
@@ -1053,6 +1261,36 @@ export async function atomicCancelAppointment(
   const release = await schedulingMutex.acquire(slotKey);
 
   try {
+    if (isTest) {
+      const updatedAppointment = {
+        ...currentAppt,
+        status: 'cancelled',
+        updatedAt: new Date().toISOString(),
+        history: [
+          ...(currentAppt.history || []),
+          {
+            date: new Date().toISOString(),
+            action: `Reunião cancelada por ${actorDesc}`
+          }
+        ]
+      };
+      inMemoryTestStore.scheduleSlots.set(getSlotDocId(date, time), {
+        appointmentId: null,
+        date,
+        time,
+        status: 'cancelled'
+      });
+      const idx = inMemoryTestStore.appointments.findIndex((a) => a && a.id === appointmentId);
+      if (idx >= 0) {
+        inMemoryTestStore.appointments[idx] = updatedAppointment;
+      }
+      return {
+        success: true,
+        persisted: true,
+        appointment: updatedAppointment
+      };
+    }
+
     const updatedAppointment = {
       ...currentAppt,
       status: 'cancelled',
@@ -1090,6 +1328,21 @@ export async function atomicCancelAppointment(
       } catch (transErr: any) {
         console.warn('[Firestore Transaction] Falha no cancelamento transacional:', transErr?.message);
       }
+    }
+
+    if (IS_PROD) {
+      if (!firestoreSaved) {
+        return {
+          success: false,
+          persisted: false,
+          reason: 'O serviço de banco de dados do Firestore está indisponível em produção.'
+        };
+      }
+      return {
+        success: true,
+        persisted: true,
+        appointment: updatedAppointment
+      };
     }
 
     const current = getServerAppData();
@@ -1131,6 +1384,9 @@ export async function atomicDeleteAppointment(appointmentId: string): Promise<bo
         console.warn('[Firestore Admin] Erro ao excluir no Firestore:', err?.message);
       }
     }
+    if (IS_PROD) {
+      return true;
+    }
     const current = getServerAppData();
     current.appointments = (current.appointments || []).filter((a: any) => a && a.id !== appointmentId);
     return saveServerAppData(current);
@@ -1139,33 +1395,56 @@ export async function atomicDeleteAppointment(appointmentId: string): Promise<bo
   }
 }
 
+/**
+ * Sincronização de horários ocupados (schedule_slots):
+ * Sincroniza EXCLUSIVAMENTE a partir da coleção oficial do Firestore (SSOT).
+ * NUNCA lê admin_app_data.json, NUNCA restaura dados locais quando Firestore estiver vazio,
+ * e NUNCA sincroniza agendamentos fictícios.
+ */
 export async function syncScheduleSlots(): Promise<void> {
+  const isAvailable = await checkFirestoreAvailability();
+  if (!adminDb || !isAvailable) {
+    console.log('[Schedule Engine] Firestore indisponível para sincronização de schedule_slots.');
+    return;
+  }
+
   try {
-    const appointments = await getAllAppointments();
-    let synced = 0;
-    const isAvailable = await checkFirestoreAvailability();
-    if (adminDb && isAvailable) {
-      for (const appt of appointments) {
-        if (!appt || !appt.date || !appt.time || appt.status === 'cancelled') continue;
-        try {
-          const slotRef = adminDb.collection('schedule_slots').doc(getSlotDocId(appt.date, appt.time));
-          await slotRef.set(
-            {
-              appointmentId: appt.id,
-              date: appt.date,
-              time: appt.time,
-              status: 'confirmed',
-              updatedAt: new Date().toISOString()
-            },
-            { merge: true }
-          );
-          synced++;
-        } catch {}
-      }
+    const snap = await adminDb.collection('appointments').get();
+    if (snap.empty) {
+      console.log('[Schedule Engine] Firestore appointments está vazio. Nenhum slot fictício sincronizado.');
+      return;
     }
-    console.log(`[Schedule Engine] Integridade de horários sincronizada (${appointments.length} agendamentos avaliados, ${synced} slots mapeados no Firestore).`);
+
+    let synced = 0;
+    const batch = adminDb.batch();
+    let batchCount = 0;
+
+    snap.forEach((doc: any) => {
+      const appt = doc.data();
+      if (!appt || !appt.date || !appt.time || appt.status === 'cancelled') return;
+
+      const slotRef = adminDb.collection('schedule_slots').doc(getSlotDocId(appt.date, appt.time));
+      batch.set(
+        slotRef,
+        {
+          appointmentId: doc.id,
+          date: appt.date,
+          time: appt.time,
+          status: 'confirmed',
+          updatedAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
+      batchCount++;
+      synced++;
+    });
+
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+    console.log(`[Schedule Engine] Integridade de horários sincronizada do Firestore (${snap.size} agendamentos avaliados, ${synced} slots mapeados).`);
   } catch (err: any) {
-    console.warn('[Schedule Engine] Aviso na sincronização de horários:', err?.message);
+    console.warn('[Schedule Engine] Aviso na sincronização de horários no Firestore:', err?.message);
   }
 }
 
@@ -1396,7 +1675,9 @@ apiRouter.get('/health', async (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     firestore: isAvailable ? 'connected' : 'offline',
-    runtime: IS_VERCEL ? 'vercel-serverless' : 'node-server'
+    runtime: IS_VERCEL ? 'vercel-serverless' : 'node-server',
+    production: IS_PROD,
+    fallbackProtected: true
   });
 });
 
@@ -1482,8 +1763,46 @@ apiRouter.post('/config', requireAdminAuth, async (req, res) => {
 });
 
 // 1.2 Endpoint PÚBLICO para checagem segura de horários ocupados (ZERO PII)
-apiRouter.get('/booked-slots', async (_req, res) => {
+apiRouter.get('/booked-slots', async (req, res) => {
   try {
+    const isTest = isTestRequest(req);
+    if (isTest) {
+      const appts = inMemoryTestStore.appointments || [];
+      const bookedSlots = appts
+        .filter((a) => a && a.status !== 'cancelled' && a.date && a.time)
+        .map((a) => ({ date: a.date, time: a.time }));
+      return res.status(200).json({ success: true, bookedSlots });
+    }
+
+    const isAvailable = await checkFirestoreAvailability();
+    if (adminDb && isAvailable) {
+      try {
+        const slotSnap = await adminDb.collection('schedule_slots').get();
+        const bookedSlots: Array<{ date: string; time: string }> = [];
+        slotSnap.forEach((doc: any) => {
+          const data = doc.data();
+          if (data && data.status !== 'cancelled' && data.status !== 'released' && data.date && data.time) {
+            bookedSlots.push({ date: data.date, time: data.time });
+          }
+        });
+        return res.status(200).json({ success: true, bookedSlots });
+      } catch (firestoreErr: any) {
+        if (IS_PROD) {
+          return res.status(503).json({
+            success: false,
+            error: 'Serviço de agendamento temporariamente indisponível no Firestore.'
+          });
+        }
+      }
+    }
+
+    if (IS_PROD) {
+      return res.status(503).json({
+        success: false,
+        error: 'Serviço de agendamento indisponível no ambiente de produção.'
+      });
+    }
+
     const appointments = await getAllAppointments();
     const bookedSlots = appointments
       .filter((a) => a && a.status !== 'cancelled' && a.date && a.time)
@@ -1495,9 +1814,21 @@ apiRouter.get('/booked-slots', async (_req, res) => {
 });
 
 // 1.3 Listagem de Agendamentos (REQUER ADMIN)
-apiRouter.get('/appointments', requireAdminAuth, async (_req, res) => {
+apiRouter.get('/appointments', requireAdminAuth, async (req, res) => {
   try {
-    const appointments = await getAllAppointments();
+    const isTest = isTestRequest(req);
+    let appointments: any[] = [];
+    try {
+      appointments = await getAllAppointments({ isTest });
+    } catch (err: any) {
+      if (IS_PROD) {
+        return res.status(503).json({
+          success: false,
+          error: 'Serviço de agendamentos indisponível no Firestore de produção.'
+        });
+      }
+      throw err;
+    }
     const sanitized = appointments.map((a) => {
       const copy = { ...a };
       delete copy.tokenHash;
@@ -1514,6 +1845,7 @@ apiRouter.get('/appointments', requireAdminAuth, async (_req, res) => {
 // Criar novo agendamento (Público no fluxo de agendamento: BLOQUEIA SOBRESCRITA, CONCORRÊNCIA ATÔMICA E RATE LIMITING)
 apiRouter.post('/appointments', createRateLimitMiddleware(appointmentCreateLimiter), async (req, res) => {
   try {
+    const isTest = isTestRequest(req);
     const adminUser = await getAuthenticatedAdmin(req);
     const body = req.body?.appointment || req.body;
 
@@ -1525,19 +1857,19 @@ apiRouter.post('/appointments', createRateLimitMiddleware(appointmentCreateLimit
       if (!body.id || !body.clientName || !body.date || !body.time) {
         return res.status(400).json({ success: false, error: 'Dados obrigatórios do agendamento incompletos.' });
       }
-      const existingAppt = await getAppointmentById(body.id);
+      const existingAppt = await getAppointmentById(body.id, { isTest });
       const appointmentToSave = {
         ...(existingAppt || {}),
         ...body,
         updatedAt: new Date().toISOString()
       };
-      await persistAppointment(appointmentToSave);
+      await persistAppointment(appointmentToSave, isTest);
       return res.status(200).json({ success: true, message: 'Agendamento salvo pelo administrador.', appointment: appointmentToSave });
     }
 
     // --- REQUISIÇÃO PÚBLICA ---
     if (body.id && typeof body.id === 'string') {
-      const existing = await getAppointmentById(body.id);
+      const existing = await getAppointmentById(body.id, { isTest });
       if (existing) {
         return res.status(409).json({
           success: false,
@@ -1601,7 +1933,7 @@ apiRouter.post('/appointments', createRateLimitMiddleware(appointmentCreateLimit
       confidentialityAccepted: Boolean(body.confidentialityAccepted)
     };
 
-    const creationResult = await atomicCreateAppointment(sanitizedAppointment);
+    const creationResult = await atomicCreateAppointment(sanitizedAppointment, isTest);
     if (!creationResult.success) {
       if (creationResult.conflict) {
         return res.status(409).json({ success: false, error: creationResult.reason });
@@ -1613,14 +1945,20 @@ apiRouter.post('/appointments', createRateLimitMiddleware(appointmentCreateLimit
       success: false,
       requiresAppPassword: false
     };
-    try {
-      emailResult = await sendServerAppointmentEmail({
-        ...sanitizedAppointment,
-        manageToken: rawManageToken
-      });
-    } catch (mailErr: any) {
-      console.warn('[Email Trigger] Falha no disparo do e-mail de agendamento:', mailErr?.message);
-      emailResult = { success: false, requiresAppPassword: false, error: mailErr?.message };
+
+    if (!isTest) {
+      try {
+        emailResult = await sendServerAppointmentEmail({
+          ...sanitizedAppointment,
+          manageToken: rawManageToken
+        });
+      } catch (mailErr: any) {
+        console.warn('[Email Trigger] Falha no disparo do e-mail de agendamento:', mailErr?.message);
+        emailResult = { success: false, requiresAppPassword: false, error: mailErr?.message };
+      }
+    } else {
+      // Em modo de teste, simula envio seguro sem poluir SMTP externo
+      emailResult = { success: false, requiresAppPassword: true };
     }
 
     const clientResponseAppt = { ...sanitizedAppointment };
@@ -1660,11 +1998,12 @@ apiRouter.delete('/appointments/:id', requireAdminAuth, async (req, res) => {
 // Reenviar confirmação de agendamento existente (REQUER ADMIN OU TITULAR COM TOKEN VÁLIDO + RATE LIMITING)
 apiRouter.post('/appointments/resend-confirmation', createRateLimitMiddleware(resendConfirmationLimiter), async (req, res) => {
   try {
+    const isTest = isTestRequest(req);
     const { appointmentId } = req.body;
     if (!appointmentId || typeof appointmentId !== 'string') {
       return res.status(400).json({ success: false, error: 'Identificador do agendamento é obrigatório.' });
     }
-    const appointment = await getAppointmentById(appointmentId);
+    const appointment = await getAppointmentById(appointmentId, { isTest });
     if (!appointment) {
       return res.status(404).json({ success: false, error: 'Agendamento não encontrado.' });
     }
@@ -1674,6 +2013,14 @@ apiRouter.post('/appointments/resend-confirmation', createRateLimitMiddleware(re
       return res.status(authCheck.errorStatus || 403).json({
         success: false,
         error: authCheck.errorMessage || 'Acesso negado. Apenas o titular autorizado ou a administradora podem solicitar o reenvio da confirmação.'
+      });
+    }
+
+    if (isTest) {
+      return res.status(200).json({
+        success: true,
+        message: `E-mail de confirmação validado para ${appointment.clientEmail}.`,
+        emailResult: { success: true }
       });
     }
 
@@ -1691,13 +2038,14 @@ apiRouter.post('/appointments/resend-confirmation', createRateLimitMiddleware(re
 // Recuperação segura de acesso ao agendamento por e-mail (TIMING-SAFE + RATE LIMITING)
 apiRouter.post('/appointments/request-access', createRateLimitMiddleware(requestAccessLimiter), async (req, res) => {
   try {
+    const isTest = isTestRequest(req);
     const { clientEmail } = req.body;
     if (!clientEmail || typeof clientEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail.trim())) {
       return res.status(400).json({ success: false, error: 'E-mail válido é obrigatório.' });
     }
 
     const emailNorm = clientEmail.trim().toLowerCase();
-    const all = await getAllAppointments();
+    const all = await getAllAppointments({ isTest });
     const clientAppts = all.filter(
       (a) => a && a.clientEmail && a.clientEmail.toLowerCase() === emailNorm && a.status !== 'cancelled'
     );
@@ -1709,29 +2057,31 @@ apiRouter.post('/appointments/request-access', createRateLimitMiddleware(request
 
       targetAppt.tokenHash = newTokenHash;
       targetAppt.tokenCreatedAt = new Date().toISOString();
-      await persistAppointment(targetAppt);
+      await persistAppointment(targetAppt, isTest);
 
       const dateFormatted = targetAppt.date.split('-').reverse().join('/');
       const manageUrl = `${req.protocol}://${req.get('host')}/?manage_id=${targetAppt.id}&token=${newRawToken}#meeting`;
 
-      const config = getServerConfig();
-      const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
-      const gmailPass = (rawPass || '').replace(/\s+/g, '');
+      if (!isTest) {
+        const config = getServerConfig();
+        const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
+        const gmailPass = (rawPass || '').replace(/\s+/g, '');
 
-      if (gmailPass) {
-        try {
-          const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
-          });
-          await transporter.sendMail({
-            from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
-            to: targetAppt.clientEmail,
-            subject: `Acesso ao seu Agendamento: Bee-ginning 4 you (${dateFormatted} às ${targetAppt.time})`,
-            text: `Olá, ${targetAppt.clientName}!\n\nRecebemos uma solicitação de acesso para o gerenciamento da sua reunião virtual marcada para ${dateFormatted} às ${targetAppt.time}.\n\nPara visualizar, reagendar ou cancelar sua reunião com total segurança, acesse o link abaixo:\n${manageUrl}\n\nSe você não solicitou este acesso, ignore esta mensagem.\n\nAtenciosamente,\nEquipe Bee-ginning 4 you`
-          });
-        } catch (emailErr: any) {
-          console.warn('[Email Service] Falha ao enviar link de recuperação de agendamento:', emailErr?.message);
+        if (gmailPass) {
+          try {
+            const transporter = nodemailer.createTransport({
+              service: 'gmail',
+              auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
+            });
+            await transporter.sendMail({
+              from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
+              to: targetAppt.clientEmail,
+              subject: `Acesso ao seu Agendamento: Bee-ginning 4 you (${dateFormatted} às ${targetAppt.time})`,
+              text: `Olá, ${targetAppt.clientName}!\n\nRecebemos uma solicitação de acesso para o gerenciamento da sua reunião virtual marcada para ${dateFormatted} às ${targetAppt.time}.\n\nPara visualizar, reagendar ou cancelar sua reunião com total segurança, acesse o link abaixo:\n${manageUrl}\n\nSe você não solicitou este acesso, ignore esta mensagem.\n\nAtenciosamente,\nEquipe Bee-ginning 4 you`
+            });
+          } catch (emailErr: any) {
+            console.warn('[Email Service] Falha ao enviar link de recuperação de agendamento:', emailErr?.message);
+          }
         }
       }
     }
@@ -1748,11 +2098,12 @@ apiRouter.post('/appointments/request-access', createRateLimitMiddleware(request
 // Reagendamento (AUTORIZAÇÃO VERIFICÁVEL + CONCORRÊNCIA ATÔMICA)
 apiRouter.post('/appointments/reschedule-notification', async (req, res) => {
   try {
+    const isTest = isTestRequest(req);
     const { appointmentId, newDate, newTime } = req.body;
     if (!appointmentId || typeof appointmentId !== 'string') {
       return res.status(400).json({ success: false, persisted: false, error: 'Identificador do agendamento é obrigatório.' });
     }
-    const appointment = await getAppointmentById(appointmentId);
+    const appointment = await getAppointmentById(appointmentId, { isTest });
     if (!appointment) {
       return res.status(404).json({ success: false, persisted: false, error: 'Agendamento não encontrado.' });
     }
@@ -1785,7 +2136,7 @@ apiRouter.post('/appointments/reschedule-notification', async (req, res) => {
     }
 
     const actorDesc = authCheck.isAdmin ? 'administrador' : 'cliente';
-    const rescheduleResult = await atomicRescheduleAppointment(appointmentId, targetDate, targetTime, actorDesc);
+    const rescheduleResult = await atomicRescheduleAppointment(appointmentId, targetDate, targetTime, actorDesc, isTest);
 
     if (!rescheduleResult.success) {
       if (rescheduleResult.conflict) {
@@ -1803,6 +2154,16 @@ apiRouter.post('/appointments/reschedule-notification', async (req, res) => {
     }
 
     const updatedAppointment = rescheduleResult.appointment;
+
+    if (isTest) {
+      return res.status(200).json({
+        success: true,
+        persisted: true,
+        requiresAppPassword: true,
+        message: 'Reagendamento persistido com sucesso no ambiente isolado de testes.',
+        appointment: updatedAppointment
+      });
+    }
 
     const config = getServerConfig();
     const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
@@ -1871,11 +2232,12 @@ apiRouter.post('/appointments/reschedule-notification', async (req, res) => {
 // Cancelamento (AUTORIZAÇÃO VERIFICÁVEL + LIBERAÇÃO ATÔMICA DO HORÁRIO)
 apiRouter.post('/appointments/cancel-notification', async (req, res) => {
   try {
+    const isTest = isTestRequest(req);
     const { appointmentId } = req.body;
     if (!appointmentId || typeof appointmentId !== 'string') {
       return res.status(400).json({ success: false, persisted: false, error: 'Identificador do agendamento é obrigatório.' });
     }
-    const appointment = await getAppointmentById(appointmentId);
+    const appointment = await getAppointmentById(appointmentId, { isTest });
     if (!appointment) {
       return res.status(404).json({ success: false, persisted: false, error: 'Agendamento não encontrado.' });
     }
@@ -1890,7 +2252,7 @@ apiRouter.post('/appointments/cancel-notification', async (req, res) => {
     }
 
     const actorDesc = authCheck.isAdmin ? 'administrador' : 'cliente';
-    const cancelResult = await atomicCancelAppointment(appointmentId, actorDesc);
+    const cancelResult = await atomicCancelAppointment(appointmentId, actorDesc, isTest);
 
     if (!cancelResult.success) {
       return res.status(500).json({
@@ -1901,6 +2263,16 @@ apiRouter.post('/appointments/cancel-notification', async (req, res) => {
     }
 
     const updatedAppointment = cancelResult.appointment;
+
+    if (isTest) {
+      return res.status(200).json({
+        success: true,
+        persisted: true,
+        requiresAppPassword: true,
+        message: 'Cancelamento persistido no ambiente isolado de testes.',
+        appointment: updatedAppointment
+      });
+    }
 
     const config = getServerConfig();
     const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
@@ -1962,8 +2334,13 @@ apiRouter.post('/appointments/cancel-notification', async (req, res) => {
 });
 
 // 1.4 Demandas e Formulários de Contato (LISTAGEM REQUER ADMIN)
-apiRouter.get('/demands', requireAdminAuth, async (_req, res) => {
+apiRouter.get('/demands', requireAdminAuth, async (req, res) => {
   try {
+    const isTest = isTestRequest(req);
+    if (isTest) {
+      return res.status(200).json({ success: true, demands: inMemoryTestStore.demands || [] });
+    }
+
     const isAvailable = await checkFirestoreAvailability();
     if (adminDb && isAvailable) {
       try {
@@ -1974,8 +2351,22 @@ apiRouter.get('/demands', requireAdminAuth, async (_req, res) => {
         return res.status(200).json({ success: true, demands: items });
       } catch (err: any) {
         console.warn('[Firestore Demands] Fallback para leitura de demandas:', err?.message);
+        if (IS_PROD) {
+          return res.status(503).json({
+            success: false,
+            error: 'Serviço de demandas indisponível no Firestore de produção.'
+          });
+        }
       }
     }
+
+    if (IS_PROD) {
+      return res.status(503).json({
+        success: false,
+        error: 'Banco de dados de demandas indisponível em produção.'
+      });
+    }
+
     const data = getServerAppData();
     return res.status(200).json({ success: true, demands: data.demands || [] });
   } catch (err: any) {
@@ -1986,11 +2377,84 @@ apiRouter.get('/demands', requireAdminAuth, async (_req, res) => {
 // Criar nova demanda de contato (Público para formulário: BLOQUEIA SOBRESCRITA, RATE LIMITING E FILTRA CAMPOS)
 apiRouter.post('/demands', createRateLimitMiddleware(demandCreateLimiter), async (req, res) => {
   try {
+    const isTest = isTestRequest(req);
     const adminUser = await getAuthenticatedAdmin(req);
     const body = req.body?.demand || req.body;
 
     if (!body || typeof body !== 'object') {
       return res.status(400).json({ success: false, error: 'Dados da demanda inválidos.' });
+    }
+
+    if (isTest) {
+      const existing = inMemoryTestStore.demands || [];
+      if (adminUser) {
+        if (!body.id || !body.name) {
+          return res.status(400).json({ success: false, error: 'Nome e identificador da demanda são obrigatórios.' });
+        }
+        const index = existing.findIndex((d) => d.id === body.id);
+        if (index >= 0) {
+          existing[index] = { ...existing[index], ...body };
+        } else {
+          existing.unshift(body);
+        }
+        inMemoryTestStore.demands = existing;
+        return res.status(200).json({ success: true, message: 'Demanda salva pelo administrador.', demand: body });
+      }
+
+      if (body.id && typeof body.id === 'string' && existing.some((d) => d.id === body.id)) {
+        return res.status(409).json({
+          success: false,
+          error: 'Identificador já existente. Operações públicas não podem sobrescrever registros.'
+        });
+      }
+
+      const name = typeof body.name === 'string' ? body.name.trim() : '';
+      const email = typeof body.email === 'string' ? body.email.trim() : '';
+      const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+      const contactValue = typeof body.contactValue === 'string' ? body.contactValue.trim() : '';
+
+      if (!name || name.length > 200) {
+        return res.status(400).json({ success: false, error: 'O nome é obrigatório (máximo 200 caracteres).' });
+      }
+
+      if (!email && !phone && !contactValue) {
+        return res.status(400).json({
+          success: false,
+          error: 'É obrigatório informar ao menos uma forma de contato (e-mail ou telefone/WhatsApp).'
+        });
+      }
+
+      const trustedId = (body.id && typeof body.id === 'string' && /^[a-zA-Z0-9_-]{3,128}$/.test(body.id))
+        ? body.id
+        : `demand-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+      const sanitizedDemand = {
+        id: trustedId,
+        name,
+        businessName: typeof body.businessName === 'string' ? body.businessName.trim().slice(0, 200) : '',
+        segment: typeof body.segment === 'string' ? body.segment.trim().slice(0, 100) : '',
+        contactMethod: body.contactMethod === 'email' ? 'email' : 'whatsapp',
+        contactValue: typeof body.contactValue === 'string' ? body.contactValue.trim().slice(0, 200) : '',
+        phone: typeof body.phone === 'string' ? body.phone.trim().slice(0, 50) : '',
+        email: typeof body.email === 'string' ? body.email.trim().slice(0, 200) : '',
+        biggestNeed: typeof body.biggestNeed === 'string' ? body.biggestNeed.trim().slice(0, 3000) : '',
+        businessDescription: typeof body.businessDescription === 'string' ? body.businessDescription.trim().slice(0, 3000) : '',
+        projectStage: typeof body.projectStage === 'string' ? body.projectStage.trim().slice(0, 100) : '',
+        mainGoal: typeof body.mainGoal === 'string' ? body.mainGoal.trim().slice(0, 200) : '',
+        urgency: typeof body.urgency === 'string' ? body.urgency.trim().slice(0, 50) : 'media',
+        origin: typeof body.origin === 'string' ? body.origin.trim().slice(0, 100) : 'site',
+        source: typeof body.source === 'string' ? body.source.trim().slice(0, 100) : 'formulario_contato',
+        status: 'Novo',
+        createdAt: new Date().toISOString()
+      };
+
+      existing.unshift(sanitizedDemand);
+      inMemoryTestStore.demands = existing;
+      return res.status(201).json({
+        success: true,
+        message: 'Demanda registrada com sucesso no ambiente de testes.',
+        demand: sanitizedDemand
+      });
     }
 
     const current = getServerAppData();
@@ -2006,14 +2470,16 @@ apiRouter.post('/demands', createRateLimitMiddleware(demandCreateLimiter), async
           await adminDb.collection('demands').doc(body.id).set(body, { merge: true });
         } catch {}
       }
-      const index = existing.findIndex((d) => d.id === body.id);
-      if (index >= 0) {
-        existing[index] = { ...existing[index], ...body };
-      } else {
-        existing.unshift(body);
+      if (!IS_PROD) {
+        const index = existing.findIndex((d) => d.id === body.id);
+        if (index >= 0) {
+          existing[index] = { ...existing[index], ...body };
+        } else {
+          existing.unshift(body);
+        }
+        current.demands = existing;
+        saveServerAppData(current);
       }
-      current.demands = existing;
-      saveServerAppData(current);
       return res.status(200).json({ success: true, message: 'Demanda salva pelo administrador.', demand: body });
     }
 
@@ -2065,17 +2531,28 @@ apiRouter.post('/demands', createRateLimitMiddleware(demandCreateLimiter), async
     };
 
     const isAvailable = await checkFirestoreAvailability();
+    let firestoreSaved = false;
     if (adminDb && isAvailable) {
       try {
         await adminDb.collection('demands').doc(trustedId).set(sanitizedDemand);
+        firestoreSaved = true;
       } catch (err: any) {
         console.warn('[Firestore Demands] Erro ao gravar demanda no Firestore:', err?.message);
       }
     }
 
-    existing.unshift(sanitizedDemand);
-    current.demands = existing;
-    saveServerAppData(current);
+    if (IS_PROD && !firestoreSaved) {
+      return res.status(503).json({
+        success: false,
+        error: 'Serviço de demandas indisponível no Firestore em produção.'
+      });
+    }
+
+    if (!IS_PROD) {
+      existing.unshift(sanitizedDemand);
+      current.demands = existing;
+      saveServerAppData(current);
+    }
 
     return res.status(201).json({
       success: true,

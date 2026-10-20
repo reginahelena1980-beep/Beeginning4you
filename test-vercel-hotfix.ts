@@ -10,6 +10,21 @@ import app from './api/index';
 import { safeFetchJson } from './src/utils/calendar';
 import http from 'http';
 
+const BASE_URL = process.env.TEST_BASE_URL || 'http://127.0.0.1:3000';
+
+// GUARDA DE SEGURANÇA: Impede execução contra URLs públicas ou ambientes de produção
+if (
+  BASE_URL.startsWith('https://') ||
+  BASE_URL.includes('.run.app') ||
+  BASE_URL.includes('.vercel.app') ||
+  BASE_URL.includes('.web.app') ||
+  BASE_URL.includes('firebaseapp.com') ||
+  (!BASE_URL.includes('127.0.0.1') && !BASE_URL.includes('localhost'))
+) {
+  console.error(`\n🛑 [BLOQUEIO DE SEGURANÇA]: Testes automatizados com criação/alteração de dados NÃO podem ser executados contra URLs públicas (${BASE_URL}). Abortando.`);
+  process.exit(1);
+}
+
 interface ValidationResult {
   item: number;
   title: string;
@@ -117,7 +132,10 @@ async function runVercelHotfixTests() {
 
     const createRes = await fetch(`${serverlessUrl}/api/appointments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Test-Execution': 'true'
+      },
       body: JSON.stringify({ appointment: clientPayload })
     });
     const createData = await createRes.json().catch(() => null);
@@ -136,7 +154,9 @@ async function runVercelHotfixTests() {
 
     // ITEM 6: Registro e persistência
     console.log('\n--- ITEM 6: Registro de Agendamentos e Consulta do Horário Ocupado ---');
-    const bookedCheckRes = await fetch(`${serverlessUrl}/api/booked-slots`);
+    const bookedCheckRes = await fetch(`${serverlessUrl}/api/booked-slots`, {
+      headers: { 'X-Test-Execution': 'true' }
+    });
     const bookedCheckData = await bookedCheckRes.json().catch(() => null);
     const isBookedRecorded = (bookedCheckData?.bookedSlots || []).some(
       (b: any) => b.date === testDate && b.time === testTime
@@ -154,7 +174,10 @@ async function runVercelHotfixTests() {
     console.log('\n--- ITEM 7: Concorrência Distribuída (Anti-Colisão de Horários) ---');
     const secondReqPromise = fetch(`${serverlessUrl}/api/appointments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Test-Execution': 'true'
+      },
       body: JSON.stringify({
         appointment: {
           clientName: 'Cliente Concorrente',
@@ -221,7 +244,10 @@ async function runVercelHotfixTests() {
 
     const rescheduleRes = await fetch(`${serverlessUrl}/api/appointments/reschedule-notification`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Test-Execution': 'true'
+      },
       body: JSON.stringify({
         appointmentId: createdId,
         newDate,
@@ -234,7 +260,10 @@ async function runVercelHotfixTests() {
 
     const cancelRes = await fetch(`${serverlessUrl}/api/appointments/cancel-notification`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Test-Execution': 'true'
+      },
       body: JSON.stringify({
         appointmentId: createdId,
         manageToken: clientToken

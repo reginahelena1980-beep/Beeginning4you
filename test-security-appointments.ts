@@ -1,13 +1,27 @@
-import fetch from 'node:http';
+const BASE_URL = process.env.TEST_BASE_URL || 'http://127.0.0.1:3000';
+
+// GUARDA DE SEGURANÇA: Impede execução contra URLs públicas ou ambientes de produção
+if (
+  BASE_URL.startsWith('https://') ||
+  BASE_URL.includes('.run.app') ||
+  BASE_URL.includes('.vercel.app') ||
+  BASE_URL.includes('.web.app') ||
+  BASE_URL.includes('firebaseapp.com') ||
+  (!BASE_URL.includes('127.0.0.1') && !BASE_URL.includes('localhost'))
+) {
+  console.error(`\n🛑 [BLOQUEIO DE SEGURANÇA]: Testes automatizados com criação/alteração de dados NÃO podem ser executados contra URLs públicas (${BASE_URL}). Abortando.`);
+  process.exit(1);
+}
 
 const testSuiteIp = `198.51.100.${Math.floor(Math.random() * 200) + 1}`;
 
 async function request(urlPath: string, options: { method: string; headers?: Record<string, string>; body?: any }) {
-  const res = await globalThis.fetch(`http://127.0.0.1:3000${urlPath}`, {
+  const res = await globalThis.fetch(`${BASE_URL}${urlPath}`, {
     method: options.method,
     headers: {
       'Content-Type': 'application/json',
       'X-Forwarded-For': testSuiteIp,
+      'X-Test-Execution': 'true',
       ...(options.headers || {})
     },
     body: options.body ? JSON.stringify(options.body) : undefined

@@ -3,7 +3,6 @@ import {
   SolutionItem,
   RealProjectExample,
   AudienceProfile,
-  UseCaseStory,
   DiagnosticOption
 } from '../types';
 

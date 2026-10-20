@@ -3,7 +3,6 @@ import {
   SolutionItem,
   RealProjectExample,
   AudienceProfile,
-  UseCaseStory,
   DiagnosticOption
 } from '../types';
 
@@ -290,38 +289,6 @@ export const AUDIENCE_PROFILES: AudienceProfile[] = [
   }
 ];
 
-export const USE_CASES: UseCaseStory[] = [
-  {
-    id: 'case-1',
-    clientName: 'Carla Silveira',
-    businessName: 'Doce Afeto Confeitaria',
-    segment: 'Alimentação Artesanal',
-    before: 'Anotava pedidos em 2 cadernos e no chat do WhatsApp. Já teve entregas trocadas e perdia horas conferindo comprovantes.',
-    after: 'Catálogo digital exclusivo com fotos reais, seleção de sabores, data de entrega e envio direto para a cozinha.',
-    quote: '"Antes eu passava as noites conferindo mensagem por mensagem. Hoje o cliente monta o bolo certinho e eu ganhei meus domingos de volta."',
-    metric: 'Zero pedidos perdidos em 6 meses'
-  },
-  {
-    id: 'case-2',
-    clientName: 'Rodrigo Mendes',
-    businessName: 'Mendes Reparos & Climatização',
-    segment: 'Serviços Técnicos',
-    before: 'Clientes ligavam pedindo orçamento sem dar detalhes e muitos esqueciam a visita agendada na véspera.',
-    after: 'Página profissional rápida com formulário de triagem de defeitos e confirmação automática de presença por WhatsApp.',
-    quote: '"O cliente já me chama sabendo exatamente o valor da visita técnica e a taxa de cancelamento despencou."',
-    metric: '-80% de faltas em visitas'
-  },
-  {
-    id: 'case-3',
-    clientName: 'Dra. Luísa Faria',
-    businessName: 'Espaço Integrar Terapias',
-    segment: 'Saúde & Bem-Estar',
-    before: 'Gastava R$ 600/mês num software de clínica do qual só usava a agenda e achava a interface terrível.',
-    after: 'Painel sob medida leve e seguro, com prontuário simples e lembretes amigáveis para os pacientes.',
-    quote: '"A Beeginning entendeu que eu não precisava de um monstro tecnológico, mas sim de paz mental na recepção."',
-    metric: 'Economia de R$ 7.200/ano'
-  }
-];
 
 export const DIAGNOSTIC_OPTIONS: DiagnosticOption[] = [
   {
@@ -647,38 +614,6 @@ export const AUDIENCE_PROFILES_EN: AudienceProfile[] = [
   }
 ];
 
-export const USE_CASES_EN: UseCaseStory[] = [
-  {
-    id: 'case-1',
-    clientName: 'Carla Silveira',
-    businessName: 'Doce Afeto Confectionery',
-    segment: 'Artisanal Food & Bakery',
-    before: 'Wrote orders across 2 notebooks and chaotic WhatsApp threads. Experienced mixed-up deliveries and spent hours checking payment slips.',
-    after: 'Exclusive digital catalog with real photos, flavor selection, delivery date picker, and direct dispatch to the kitchen.',
-    quote: '"I used to spend my late evenings reading message by message. Now the customer configures their cake perfectly and I got my Sundays back."',
-    metric: 'Zero lost orders in 6 months'
-  },
-  {
-    id: 'case-2',
-    clientName: 'Rodrigo Mendes',
-    businessName: 'Mendes HVAC & Technical Services',
-    segment: 'Technical Services',
-    before: 'Clients called requesting quotes without basic details, and many forgot the technician visit booked the previous week.',
-    after: 'Fast professional landing page with an issue diagnosis form and automatic SMS/WhatsApp appointment reminders.',
-    quote: '"Clients now reach out already aware of the site-visit fee, and no-shows have plummeted drastically."',
-    metric: '-80% fewer missed appointments'
-  },
-  {
-    id: 'case-3',
-    clientName: 'Dr. Luísa Faria',
-    businessName: 'Espaço Integrar Wellness & Therapy',
-    segment: 'Health & Well-being',
-    before: 'Spent $120/month on clinical software of which she only used the calendar and found the interface frustratingly slow.',
-    after: 'Lightweight, secure bespoke dashboard with simple intake records and warm automated appointment reminders for patients.',
-    quote: '"Beeginning understood that I didn\'t need a tech monster, but rather peace of mind at my front desk."',
-    metric: 'Over $1,400 saved annually'
-  }
-];
 
 export const DIAGNOSTIC_OPTIONS_EN: DiagnosticOption[] = [
   {
@@ -730,8 +665,7 @@ export const getSolutions = (lang: string = 'pt'): SolutionItem[] =>
 export const getAudienceProfiles = (lang: string = 'pt'): AudienceProfile[] =>
   lang === 'en' ? AUDIENCE_PROFILES_EN : AUDIENCE_PROFILES;
 
-export const getUseCases = (lang: string = 'pt'): UseCaseStory[] =>
-  lang === 'en' ? USE_CASES_EN : USE_CASES;
+
 
 export const getDiagnosticOptions = (lang: string = 'pt'): DiagnosticOption[] =>
   lang === 'en' ? DIAGNOSTIC_OPTIONS_EN : DIAGNOSTIC_OPTIONS;
