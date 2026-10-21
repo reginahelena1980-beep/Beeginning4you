@@ -151,7 +151,6 @@ export async function saveAppointment(appointment: MeetingAppointment): Promise<
     if (typeof window !== 'undefined' && token && savedAppt.id) {
       try {
         sessionStorage.setItem(`appt_token_${savedAppt.id}`, token);
-        localStorage.setItem(`appt_token_${savedAppt.id}`, token);
       } catch {}
     }
     notifyStorageChange();
@@ -353,7 +352,7 @@ export async function sendOfficialConfirmationEmail(
     const manageToken =
       appointment.manageToken ||
       (typeof window !== 'undefined'
-        ? sessionStorage.getItem(`appt_token_${appointment.id}`) || localStorage.getItem(`appt_token_${appointment.id}`)
+        ? sessionStorage.getItem(`appt_token_${appointment.id}`)
         : '') ||
       '';
 

@@ -326,10 +326,10 @@ try {
       console.log(`[Firebase Admin] SDK inicializado via Service Account JSON para projeto: ${parsedSA.project_id || FIREBASE_PROJECT_ID}`);
     } else {
       const privateKey = process.env.FIREBASE_PRIVATE_KEY || (rawKey && rawKey.includes('BEGIN PRIVATE KEY') ? rawKey : undefined);
-      const clientEmail =
-        process.env.FIREBASE_CLIENT_EMAIL ||
-        process.env.AUTHORIZED_SERVICE_ACCOUNT_EMAIL ||
-        (privateKey ? `firebase-adminsdk-fbsvc@${FIREBASE_PROJECT_ID}.iam.gserviceaccount.com` : undefined);
+      let clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      if (!clientEmail || !clientEmail.includes('gserviceaccount.com')) {
+        clientEmail = `firebase-adminsdk-fbsvc@${FIREBASE_PROJECT_ID}.iam.gserviceaccount.com`;
+      }
 
       if (privateKey && clientEmail) {
         firebaseAdminApp = initializeApp({
@@ -1561,7 +1561,8 @@ export async function sendServerAppointmentEmail(appointment: {
 }) {
   const config = getServerConfig();
   const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
-  const gmailPass = (rawPass || '').replace(/\s+/g, '');
+  const gmailPass = (rawPass || '').replace(/\s+/g, '').replace(/^["']|["']$/g, '');
+  const senderEmail = (process.env.GMAIL_USER || OFFICIAL_EMAIL || 'beeginning4you@gmail.com').trim();
 
   if (!gmailPass) {
     console.warn(`[Email Service] GMAIL_APP_PASSWORD não configurada no servidor. Notificação registrada para: ${appointment.clientEmail}`);
@@ -1571,44 +1572,74 @@ export async function sendServerAppointmentEmail(appointment: {
   const dateFormatted = appointment.date.split('-').reverse().join('/');
   const subject = `Confirmação de Reunião: Beeginning 4 you (${dateFormatted} às ${appointment.time})`;
 
+  const cleanDate = appointment.date.replace(/-/g, '');
+  const [hours, minutes] = (appointment.time || '10:00').split(':').map(Number);
+  const startHoursStr = String(hours || 10).padStart(2, '0');
+  const startMinutesStr = String(minutes || 0).padStart(2, '0');
+  const startTimeStr = `${startHoursStr}${startMinutesStr}00`;
+  const totalMinutes = (hours || 10) * 60 + (minutes || 0) + 45;
+  const endHoursStr = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+  const endMinutesStr = String(totalMinutes % 60).padStart(2, '0');
+  const endTimeStr = `${endHoursStr}${endMinutesStr}00`;
+
+  const calTitle = encodeURIComponent(`Reunião Bee-ginning 4 You: Diagnóstico & Ideia de Negócio (${appointment.clientName})`);
+  const calDetails = encodeURIComponent(
+    `Reunião Virtual de Alinhamento e Diagnóstico Digital - Bee-ginning 4 You\n\n` +
+    `📧 Remetente Oficial: ${senderEmail}\n` +
+    `👤 Participante / Cliente: ${appointment.clientName} (${appointment.clientEmail})\n` +
+    `💻 Sala Google Meet: ${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}\n\n` +
+    `🔒 Compromisso de Sigilo e LGPD: Garantia total de sigilo comercial e proteção de dados.`
+  );
+  const calLocation = encodeURIComponent(appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm');
+  const calAttendees = encodeURIComponent(`${senderEmail},${appointment.clientEmail}`);
+  const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${calTitle}&dates=${cleanDate}T${startTimeStr}/${cleanDate}T${endTimeStr}&details=${calDetails}&location=${calLocation}&add=${calAttendees}&ctz=America/Sao_Paulo`;
+
   const textBody =
     `Olá, ${appointment.clientName}!\n\n` +
-    `Este é o e-mail oficial da Beeginning 4 you (${OFFICIAL_EMAIL}) confirmando o agendamento da sua reunião virtual:\n\n` +
+    `Este é o e-mail oficial da Beeginning 4 you (${senderEmail}) confirmando o agendamento da sua reunião virtual:\n\n` +
     `📅 Data: ${dateFormatted}\n` +
     `⏰ Horário: ${appointment.time} (Horário de Brasília)\n` +
     `⏳ Duração: 45 minutos\n` +
     `💻 Sala Virtual Google Meet: ${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}\n` +
     `💡 Assunto: ${appointment.topic || 'Conversa inicial sobre ideia de negócio'}\n\n` +
+    `📅 Adicionar ao Google Agenda:\n${googleCalendarUrl}\n\n` +
     `🔒 Compromisso de Sigilo e LGPD:\n` +
     `A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD (Lei nº 13.709/2018).\n\n` +
     `Atenciosamente,\n` +
     `Equipe Beeginning 4 you\n` +
-    `E-mail: ${OFFICIAL_EMAIL}\n` +
+    `E-mail: ${senderEmail}\n` +
     `WhatsApp Oficial: (11) 98629-7916`;
 
   const htmlBody = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1A1A1A; max-width: 600px; margin: 0 auto; border: 1px solid #EAE6DF; border-radius: 12px; overflow: hidden;">
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1A1A1A; max-width: 600px; margin: 0 auto; border: 1px solid #EAE6DF; border-radius: 12px; overflow: hidden; background-color: #FFFFFF;">
       <div style="background-color: #1E3A47; padding: 24px; color: #FFFFFF; text-align: center;">
-        <h2 style="margin: 0; font-size: 20px;">Bee-ginning 4 you</h2>
-        <p style="margin: 6px 0 0; font-size: 13px; color: #E5A93B;">Reunião Confirmada com Sucesso</p>
+        <h2 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: -0.5px;">Bee-ginning 4 you</h2>
+        <p style="margin: 6px 0 0; font-size: 13px; color: #E5A93B; font-weight: 600;">Reunião Confirmada com Sucesso</p>
       </div>
-      <div style="padding: 24px; background-color: #FFFFFF;">
-        <p style="font-size: 15px;">Olá, <strong>${appointment.clientName}</strong>!</p>
-        <p style="font-size: 13px; color: #555555;">Sua reunião virtual com nossa equipe está confirmada:</p>
-        <div style="background-color: #F8F8F6; border-left: 4px solid #E5A93B; padding: 14px 18px; margin: 18px 0; border-radius: 4px;">
+      <div style="padding: 24px;">
+        <p style="font-size: 15px; margin-top: 0;">Olá, <strong>${appointment.clientName}</strong>!</p>
+        <p style="font-size: 13px; color: #555555;">Sua reunião virtual com nossa equipe está confirmada com os seguintes detalhes:</p>
+        <div style="background-color: #F8F8F6; border-left: 4px solid #E5A93B; padding: 16px 18px; margin: 18px 0; border-radius: 6px;">
           <p style="margin: 4px 0; font-size: 14px;"><strong>📅 Data:</strong> ${dateFormatted}</p>
           <p style="margin: 4px 0; font-size: 14px;"><strong>⏰ Horário:</strong> ${appointment.time} (Horário de Brasília)</p>
-          <p style="margin: 4px 0; font-size: 14px;"><strong>⏳ Duração:</strong> 45 min</p>
-          <p style="margin: 4px 0; font-size: 14px;"><strong>💻 Sala Google Meet:</strong> <a href="${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}" style="color: #1E3A47; font-weight: bold;">${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}</a></p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>⏳ Duração:</strong> 45 minutos</p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>💻 Sala Google Meet:</strong> <a href="${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}" style="color: #1E3A47; font-weight: bold; text-decoration: underline;">${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}</a></p>
+          <p style="margin: 4px 0; font-size: 14px;"><strong>💡 Assunto:</strong> ${appointment.topic || 'Conversa inicial sobre ideia de negócio'}</p>
         </div>
-        <p style="font-size: 12px; color: #666666; background-color: #FAFAFA; padding: 12px; border-radius: 8px; border: 1px solid #EAEAEA;">
+
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${appointment.meetLink || 'https://meet.google.com/fxx-ctnv-hgm'}" style="background-color: #1E3A47; color: #FFFFFF; padding: 11px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; display: inline-block; margin-right: 8px; margin-bottom: 8px;">🎥 Entrar na Sala Google Meet</a>
+          <a href="${googleCalendarUrl}" style="background-color: #4285F4; color: #FFFFFF; padding: 11px 20px; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: bold; display: inline-block; margin-bottom: 8px;">📅 Adicionar ao Google Agenda</a>
+        </div>
+
+        <p style="font-size: 12px; color: #666666; background-color: #FAFAFA; padding: 12px 14px; border-radius: 8px; border: 1px solid #EAEAEA; margin-top: 20px;">
           🔒 <strong>Compromisso de Sigilo e LGPD:</strong><br/>
-          Garantimos sigilo absoluto sobre todas as ideias e informações compartilhadas sob proteção da LGPD.
+          A Beeginning 4 you se compromete rigorosamente a manter o sigilo absoluto sobre todas as ideias de negócio, conceitos e informações compartilhadas neste primeiro contato e em reuniões subsequentes, garantindo total segurança e propriedade intelectual ao cliente. Além disso, asseguramos a proteção dos seus dados pessoais em total conformidade com a LGPD.
         </p>
-        <p style="font-size: 13px; margin-top: 20px;">
+        <p style="font-size: 13px; margin-top: 22px; color: #333333; line-height: 1.5;">
           Aguardamos o nosso encontro!<br/>
           <strong>Equipe Bee-ginning 4 you</strong><br/>
-          📧 <a href="mailto:${OFFICIAL_EMAIL}" style="color: #1E3A47;">${OFFICIAL_EMAIL}</a><br/>
+          📧 <a href="mailto:${senderEmail}" style="color: #1E3A47;">${senderEmail}</a><br/>
           📱 WhatsApp: <a href="https://wa.me/5511986297916" style="color: #1E3A47;">(11) 98629-7916</a>
         </p>
       </div>
@@ -1619,20 +1650,26 @@ export async function sendServerAppointmentEmail(appointment: {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: OFFICIAL_EMAIL,
+        user: senderEmail,
         pass: gmailPass
-      }
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
 
+    const isDifferentClient = appointment.clientEmail.trim().toLowerCase() !== senderEmail.toLowerCase();
     const info = await transporter.sendMail({
-      from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
+      from: `"Bee-ginning 4 You" <${senderEmail}>`,
       to: appointment.clientEmail,
+      replyTo: senderEmail,
+      bcc: isDifferentClient ? senderEmail : undefined,
       subject,
       text: textBody,
       html: htmlBody
     });
 
-    console.log(`[Email Service] Confirmação oficial enviada para ${appointment.clientEmail}. ID: ${info.messageId}`);
+    console.log(`[Email Service] Confirmação oficial enviada de ${senderEmail} para ${appointment.clientEmail}. ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error: any) {
     console.error('[Email Service] Erro ao enviar e-mail de confirmação:', error?.message);
@@ -2167,7 +2204,8 @@ apiRouter.post('/appointments/reschedule-notification', async (req, res) => {
 
     const config = getServerConfig();
     const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
-    const gmailPass = (rawPass || '').replace(/\s+/g, '');
+    const gmailPass = (rawPass || '').replace(/\s+/g, '').replace(/^["']|["']$/g, '');
+    const senderEmail = (process.env.GMAIL_USER || OFFICIAL_EMAIL || 'beeginning4you@gmail.com').trim();
 
     if (!gmailPass) {
       return res.status(200).json({
@@ -2184,7 +2222,7 @@ apiRouter.post('/appointments/reschedule-notification', async (req, res) => {
       const subject = `Reagendamento de Reunião: Beeginning 4 you (Novo horário: ${dateFormatted} às ${targetTime})`;
       const text =
         `Olá, ${updatedAppointment.clientName}!\n\n` +
-        `Confirmamos que a sua reunião com a Beeginning 4 you (${OFFICIAL_EMAIL}) foi reagendada com sucesso:\n\n` +
+        `Confirmamos que a sua reunião com a Beeginning 4 you (${senderEmail}) foi reagendada com sucesso:\n\n` +
         `📅 NOVA DATA: ${dateFormatted}\n` +
         `⏰ NOVO HORÁRIO: ${targetTime} (Horário de Brasília)\n` +
         `⏳ Duração: 45 minutos\n` +
@@ -2193,16 +2231,22 @@ apiRouter.post('/appointments/reschedule-notification', async (req, res) => {
         `Todas as informações e ideias compartilhadas permanecem sob absoluto sigilo comercial e em conformidade com a LGPD.\n\n` +
         `Atenciosamente,\n` +
         `Equipe Beeginning 4 you\n` +
-        `${OFFICIAL_EMAIL}`;
+        `${senderEmail}`;
 
       const transporter = nodemailer.createTransport({
         service: 'gmail',
-        auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
+        auth: { user: senderEmail, pass: gmailPass },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000
       });
 
+      const isDiff = updatedAppointment.clientEmail.trim().toLowerCase() !== senderEmail.toLowerCase();
       const info = await transporter.sendMail({
-        from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
+        from: `"Bee-ginning 4 You" <${senderEmail}>`,
         to: updatedAppointment.clientEmail,
+        replyTo: senderEmail,
+        bcc: isDiff ? senderEmail : undefined,
         subject,
         text
       });
@@ -2276,7 +2320,8 @@ apiRouter.post('/appointments/cancel-notification', async (req, res) => {
 
     const config = getServerConfig();
     const rawPass = config.gmailAppPassword || process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD;
-    const gmailPass = (rawPass || '').replace(/\s+/g, '');
+    const gmailPass = (rawPass || '').replace(/\s+/g, '').replace(/^["']|["']$/g, '');
+    const senderEmail = (process.env.GMAIL_USER || OFFICIAL_EMAIL || 'beeginning4you@gmail.com').trim();
 
     if (!gmailPass) {
       return res.status(200).json({
@@ -2293,20 +2338,26 @@ apiRouter.post('/appointments/cancel-notification', async (req, res) => {
       const subject = `Cancelamento de Reunião: Beeginning 4 you (${dateFormatted} às ${updatedAppointment.time})`;
       const text =
         `Olá, ${updatedAppointment.clientName}!\n\n` +
-        `Confirmamos que a sua reunião com a equipe da Beeginning 4 you (${OFFICIAL_EMAIL}), anteriormente agendada para ${dateFormatted} às ${updatedAppointment.time}, foi cancelada conforme solicitado.\n\n` +
+        `Confirmamos que a sua reunião com a equipe da Beeginning 4 you (${senderEmail}), anteriormente agendada para ${dateFormatted} às ${updatedAppointment.time}, foi cancelada conforme solicitado.\n\n` +
         `Caso queira reagendar no futuro ou prefira conversar via WhatsApp (5511986297916), estamos sempre à sua disposição.\n\n` +
         `Atenciosamente,\n` +
         `Equipe Beeginning 4 you\n` +
-        `${OFFICIAL_EMAIL}`;
+        `${senderEmail}`;
 
       const transporter = nodemailer.createTransport({
         service: 'gmail',
-        auth: { user: OFFICIAL_EMAIL, pass: gmailPass }
+        auth: { user: senderEmail, pass: gmailPass },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000
       });
 
+      const isDiff = updatedAppointment.clientEmail.trim().toLowerCase() !== senderEmail.toLowerCase();
       const info = await transporter.sendMail({
-        from: `"Bee-ginning 4 You" <${OFFICIAL_EMAIL}>`,
+        from: `"Bee-ginning 4 You" <${senderEmail}>`,
         to: updatedAppointment.clientEmail,
+        replyTo: senderEmail,
+        bcc: isDiff ? senderEmail : undefined,
         subject,
         text
       });

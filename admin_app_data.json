@@ -1,4 +1,22 @@
 {
-  "appointments": [],
+  "appointments": [
+    {
+      "id": "meet-1792516571890-h6tc7",
+      "tokenHash": "d4a9c87c7199a792238624bfca385d82a2f7b58db57bb22aa7cce35bb8e76e63",
+      "tokenCreatedAt": "2026-10-20T17:16:11.890Z",
+      "tokenExpiresAt": "2026-11-13T17:00:00.000Z",
+      "clientName": "Regina Helena",
+      "clientEmail": "beeginning4you@gmail.com",
+      "clientPhone": "(11) 98629-7916",
+      "topic": "Alinhamento de projeto e teste de e-mail automático",
+      "date": "2026-11-12",
+      "time": "17:00",
+      "durationMinutes": 45,
+      "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
+      "status": "confirmed",
+      "createdAt": "2026-10-20T17:16:11.890Z",
+      "confidentialityAccepted": true
+    }
+  ],
   "demands": []
 }
