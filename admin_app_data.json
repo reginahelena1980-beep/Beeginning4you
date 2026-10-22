@@ -15,7 +15,8 @@
       "meetLink": "https://meet.google.com/fxx-ctnv-hgm",
       "status": "confirmed",
       "createdAt": "2026-10-20T17:16:11.890Z",
-      "confidentialityAccepted": true
+      "confidentialityAccepted": true,
+      "manageToken": "tok_mvio89m3_ff043679f9c3269603cbcf5aca4b1f48"
     }
   ],
   "demands": []
